@@ -1,0 +1,36 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{B88B00E1-95F6-4967-BE39-241840511CC3}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="SetIP\SetIP.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="SetIP">
+        <MSBuild Projects="SetIP\SetIP.dproj"/>
+    </Target>
+    <Target Name="SetIP:Clean">
+        <MSBuild Projects="SetIP\SetIP.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="SetIP:Make">
+        <MSBuild Projects="SetIP\SetIP.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="SetIP"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="SetIP:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="SetIP:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
