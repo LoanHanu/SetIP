@@ -102,6 +102,7 @@
             <Form>MainForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="Devices\uDevice.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

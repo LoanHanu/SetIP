@@ -5,5 +5,17 @@
     <Transaction>2024/05/16 15:48:36.000.730,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\uMainForm.pas=C:\Users\COSMO\Documents\Embarcadero\Studio\Projects\Unit1.pas</Transaction>
     <Transaction>2024/05/16 15:48:36.000.730,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\uMainForm.dfm=C:\Users\COSMO\Documents\Embarcadero\Studio\Projects\Unit1.dfm</Transaction>
     <Transaction>2024/05/16 15:49:27.000.311,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP.dproj=C:\Users\COSMO\Documents\Embarcadero\Studio\Projects\Project2.dproj</Transaction>
+    <Transaction>2024/05/22 17:19:15.758,=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:19:33.657,=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:20:31.091,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uTR40.pas=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:20:42.996,=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:21:09.040,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uOP40.pas=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:21:47.262,=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:22:26.964,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uDevice.pas=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:27:52.650,=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:28:31.437,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uDeviceManager.pas=D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Unit1.pas</Transaction>
+    <Transaction>2024/05/22 17:29:22.859,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uTR40.pas=</Transaction>
+    <Transaction>2024/05/22 17:29:28.274,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uOP40.pas=</Transaction>
+    <Transaction>2024/05/22 17:29:56.627,D:\Working\Projects\2024.05.01-Delphi_IP_Util\working\SetIP\SetIP\Devices\uDeviceManager.pas=</Transaction>
   </Transactions>
 </BorlandProject>
