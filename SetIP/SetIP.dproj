@@ -103,6 +103,9 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="Devices\uDevice.pas"/>
+        <DCCReference Include="Service\uPuttySshClient.pas"/>
+        <DCCReference Include="Service\uOpenSshClient.pas"/>
+        <DCCReference Include="uCommonUtils.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

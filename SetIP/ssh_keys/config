@@ -1,0 +1,11 @@
+# TR40 
+Host TR40 
+    HostName 10.99.4.24 
+    User ubuntu 
+    IdentityFile C:\Users\COSMO\.ssh\tr40_id_rsa 
+	
+# OP40 
+Host OP40 
+    HostName 10.99.4.24 
+    User ubuntu 
+    IdentityFile C:\Users\COSMO\.ssh\op40_id_rsa 

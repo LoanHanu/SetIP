@@ -5,13 +5,14 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, System.ImageList, Vcl.ImgList, Vcl.ExtCtrls,
-  uDevice;
+  IdIcmpClient, IdComponent, Vcl.Mask, System.IOUtils, System.Generics.Collections,
+  uDevice, uPuttySshClient;
 
 type
   TMainForm = class(TForm)
     PageControl: TPageControl;
     SheetTR40: TTabSheet;
-    SheetOP40: TTabSheet;
+    SheetIO40: TTabSheet;
     GroupBox1: TGroupBox;
     Label1: TLabel;
     ButtonTR40Ping: TButton;
@@ -56,44 +57,58 @@ type
     ButtonTR40SetIP: TButton;
     GroupBox3: TGroupBox;
     Label6: TLabel;
-    ButtonOP40Ping: TButton;
+    ButtonIO40Ping: TButton;
     Panel5: TPanel;
-    EditOP40CurrIPOctet4: TEdit;
+    EditIO40CurrIPOctet4: TEdit;
     Edit3: TEdit;
-    EditOP40CurrIPOctet3: TEdit;
+    EditIO40CurrIPOctet3: TEdit;
     Edit7: TEdit;
-    EditOP40CurrIPOctet2: TEdit;
+    EditIO40CurrIPOctet2: TEdit;
     Edit10: TEdit;
-    EditOP40CurrIPOctet1: TEdit;
+    EditIO40CurrIPOctet1: TEdit;
     GroupBox4: TGroupBox;
     Label7: TLabel;
     Label8: TLabel;
     Label9: TLabel;
     Panel6: TPanel;
-    EditOP40NewIPOctet4: TEdit;
+    EditIO40NewIPOctet4: TEdit;
     Edit15: TEdit;
-    EditOP40NewIPOctet3: TEdit;
+    EditIO40NewIPOctet3: TEdit;
     Edit19: TEdit;
-    EditOP40NewIPOctet2: TEdit;
+    EditIO40NewIPOctet2: TEdit;
     Edit22: TEdit;
-    EditOP40NewIPOctet1: TEdit;
+    EditIO40NewIPOctet1: TEdit;
     Panel7: TPanel;
-    EditOP40NewMaskOctet4: TEdit;
+    EditIO40NewMaskOctet4: TEdit;
     Edit25: TEdit;
-    EditOP40NewMaskOctet3: TEdit;
+    EditIO40NewMaskOctet3: TEdit;
     Edit27: TEdit;
-    EditOP40NewMaskOctet2: TEdit;
+    EditIO40NewMaskOctet2: TEdit;
     Edit29: TEdit;
-    EditOP40NewMaskOctet1: TEdit;
+    EditIO40NewMaskOctet1: TEdit;
     Panel8: TPanel;
-    EditOP40NewGateOctet4: TEdit;
+    EditIO40NewGateOctet4: TEdit;
     Edit32: TEdit;
-    EditOP40NewGateOctet3: TEdit;
+    EditIO40NewGateOctet3: TEdit;
     Edit34: TEdit;
-    EditOP40NewGateOctet2: TEdit;
+    EditIO40NewGateOctet2: TEdit;
     Edit36: TEdit;
-    EditOP40NewGateOctet1: TEdit;
-    ButtonOP40SetIP: TButton;
+    EditIO40NewGateOctet1: TEdit;
+    ButtonIO40SetIP: TButton;
+    GroupBox5: TGroupBox;
+    Label10: TLabel;
+    RadioButton1: TRadioButton;
+    RadioButton2: TRadioButton;
+    RadioButton3: TRadioButton;
+    EditTR40HostIP: TEdit;
+    EditTR40SshPort: TEdit;
+    EditTR40User: TEdit;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
+    Label14: TLabel;
+    ButtonSshConnect: TButton;
+    EditTR40Pass: TButtonedEdit;
 
     procedure OctetEditExit(Sender: TObject);
     procedure OctetChange(Sender: TObject);
@@ -103,10 +118,21 @@ type
     procedure ButtonTR40PingClick(Sender: TObject);
     procedure ButtonTR40SetIPClick(Sender: TObject);
 
-    procedure ButtonOP40PingClick(Sender: TObject);
-    procedure ButtonOP40SetIPClick(Sender: TObject);
+    procedure ButtonIO40PingClick(Sender: TObject);
+    procedure ButtonIO40SetIPClick(Sender: TObject);
+
+    procedure FormShow(Sender: TObject);
+
+    // procedure ScSSHClient1ServerKeyValidate(Sender: TObject; NewServerKey: TScKey; var Accept: Boolean);
+
+    procedure ButtonSshConnectClick(Sender: TObject);
+    procedure EditTR40UserChange(Sender: TObject);
+    procedure EditPasswordChange(Sender: TObject);
+    procedure EditTR40PassRightButtonClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
     FDeviceManager: TDeviceManager;
+    FSshClient: TPuttySshClient;
 
   public
     { Public declarations }
@@ -118,6 +144,9 @@ var
 implementation
 
 {$R *.dfm}
+
+uses
+  uCommonUtils;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
@@ -146,20 +175,20 @@ begin
   // Self.EditOP40CurrIPOctet3.OnExit := Self.OctetEditExit;
   // Self.EditOP40CurrIPOctet4.OnExit := Self.OctetEditExit;
 
-  EditOP40NewIPOctet1.OnExit := OctetEditExit;
-  EditOP40NewIPOctet2.OnExit := OctetEditExit;
-  EditOP40NewIPOctet3.OnExit := OctetEditExit;
-  EditOP40NewIPOctet4.OnExit := OctetEditExit;
+  EditIO40NewIPOctet1.OnExit := OctetEditExit;
+  EditIO40NewIPOctet2.OnExit := OctetEditExit;
+  EditIO40NewIPOctet3.OnExit := OctetEditExit;
+  EditIO40NewIPOctet4.OnExit := OctetEditExit;
 
-  EditOP40NewMaskOctet1.OnExit := OctetEditExit;
-  EditOP40NewMaskOctet2.OnExit := OctetEditExit;
-  EditOP40NewMaskOctet3.OnExit := OctetEditExit;
-  EditOP40NewMaskOctet4.OnExit := OctetEditExit;
+  EditIO40NewMaskOctet1.OnExit := OctetEditExit;
+  EditIO40NewMaskOctet2.OnExit := OctetEditExit;
+  EditIO40NewMaskOctet3.OnExit := OctetEditExit;
+  EditIO40NewMaskOctet4.OnExit := OctetEditExit;
 
-  EditOP40NewGateOctet1.OnExit := OctetEditExit;
-  EditOP40NewGateOctet2.OnExit := OctetEditExit;
-  EditOP40NewGateOctet3.OnExit := OctetEditExit;
-  EditOP40NewGateOctet4.OnExit := OctetEditExit;
+  EditIO40NewGateOctet1.OnExit := OctetEditExit;
+  EditIO40NewGateOctet2.OnExit := OctetEditExit;
+  EditIO40NewGateOctet3.OnExit := OctetEditExit;
+  EditIO40NewGateOctet4.OnExit := OctetEditExit;
 
   // Self.EditTR40CurrIPOctet1.OnChange := Self.OctetChange;
   // Self.EditTR40CurrIPOctet2.OnChange := Self.OctetChange;
@@ -186,53 +215,358 @@ begin
   // Self.EditOP40CurrIPOctet3.OnChange := Self.OctetChange;
   // Self.EditOP40CurrIPOctet4.OnChange := Self.OctetChange;
 
-  EditOP40NewIPOctet1.OnChange := OctetChange;
-  EditOP40NewIPOctet2.OnChange := OctetChange;
-  EditOP40NewIPOctet3.OnChange := OctetChange;
-  EditOP40NewIPOctet4.OnChange := OctetChange;
+  EditIO40NewIPOctet1.OnChange := OctetChange;
+  EditIO40NewIPOctet2.OnChange := OctetChange;
+  EditIO40NewIPOctet3.OnChange := OctetChange;
+  EditIO40NewIPOctet4.OnChange := OctetChange;
 
-  EditOP40NewMaskOctet1.OnChange := OctetChange;
-  EditOP40NewMaskOctet2.OnChange := OctetChange;
-  EditOP40NewMaskOctet3.OnChange := OctetChange;
-  EditOP40NewMaskOctet4.OnChange := OctetChange;
+  EditIO40NewMaskOctet1.OnChange := OctetChange;
+  EditIO40NewMaskOctet2.OnChange := OctetChange;
+  EditIO40NewMaskOctet3.OnChange := OctetChange;
+  EditIO40NewMaskOctet4.OnChange := OctetChange;
 
-  EditOP40NewGateOctet1.OnChange := OctetChange;
-  EditOP40NewGateOctet2.OnChange := OctetChange;
-  EditOP40NewGateOctet3.OnChange := OctetChange;
-  EditOP40NewGateOctet4.OnChange := OctetChange;
+  EditIO40NewGateOctet1.OnChange := OctetChange;
+  EditIO40NewGateOctet2.OnChange := OctetChange;
+  EditIO40NewGateOctet3.OnChange := OctetChange;
+  EditIO40NewGateOctet4.OnChange := OctetChange;
+
+  EditTR40Pass.RightButton.Enabled := True;
+  EditTR40Pass.RightButton.Visible := True;
+  EditTR40Pass.RightButton.ImageIndex := 3; // closed eye
+  EditTR40Pass.PasswordChar := '*';
 
   Self.PageControl.ActivePage := Self.SheetTR40;
 
   Self.FDeviceManager := TDeviceManager.Create;
+  // Self.FDeviceManager.LoadFromFile;
+  Self.FSshClient := TPuttySshClient.Create;
 
 end;
 
-procedure TMainForm.ButtonOP40PingClick(Sender: TObject);
+procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   //
+  FreeAndNil(Self.FDeviceManager);
+  FreeAndNil(Self.FSshClient);
+
 end;
 
-procedure TMainForm.ButtonOP40SetIPClick(Sender: TObject);
+procedure TMainForm.FormShow(Sender: TObject);
+var
+  octets: TArray<string>;
+begin
+{$REGION TR40}
+  octets := Self.FDeviceManager.TR40.IPAddress.Split(['.']);
+  if Length(octets) = 4 then
+  begin
+    Self.EditTR40CurrIPOctet1.Text := octets[0];
+    Self.EditTR40CurrIPOctet2.Text := octets[1];
+    Self.EditTR40CurrIPOctet3.Text := octets[2];
+    Self.EditTR40CurrIPOctet4.Text := octets[3];
+  end;
+
+  Self.EditTR40HostIP.Text := Self.FDeviceManager.TR40.IPAddress;
+  Self.EditTR40SshPort.Text := Self.FDeviceManager.TR40.SshPort.ToString;
+  Self.EditTR40User.Text := Self.FDeviceManager.TR40.User;
+  Self.EditTR40Pass.Text := Self.FDeviceManager.TR40.Password;
+
+  octets := Self.FDeviceManager.TR40.IPAddress.Split(['.']);
+  if Length(octets) = 4 then
+  begin
+    Self.EditTR40NewIPOctet1.Text := octets[0];
+    Self.EditTR40NewIPOctet2.Text := octets[1];
+    Self.EditTR40NewIPOctet3.Text := octets[2];
+    Self.EditTR40NewIPOctet4.Text := octets[3];
+  end;
+
+  octets := Self.FDeviceManager.TR40.SubnetMask.Split(['.']);
+  if Length(octets) = 4 then
+  begin
+    Self.EditTR40NewMaskOctet1.Text := octets[0];
+    Self.EditTR40NewMaskOctet2.Text := octets[1];
+    Self.EditTR40NewMaskOctet3.Text := octets[2];
+    Self.EditTR40NewMaskOctet4.Text := octets[3];
+  end;
+
+  octets := Self.FDeviceManager.TR40.DefaultGateway.Split(['.']);
+  if Length(octets) = 4 then
+  begin
+    Self.EditTR40NewGateOctet1.Text := octets[0];
+    Self.EditTR40NewGateOctet2.Text := octets[1];
+    Self.EditTR40NewGateOctet3.Text := octets[2];
+    Self.EditTR40NewGateOctet4.Text := octets[3];
+  end;
+{$ENDREGION}
+  //
+{$REGION OP40 }
+  octets := Self.FDeviceManager.OP40.IPAddress.Split(['.']);
+  if Length(octets) = 4 then
+  begin
+    Self.EditIO40CurrIPOctet1.Text := octets[0];
+    Self.EditIO40CurrIPOctet2.Text := octets[1];
+    Self.EditIO40CurrIPOctet3.Text := octets[2];
+    Self.EditIO40CurrIPOctet4.Text := octets[3];
+  end;
+{$ENDREGION}
+end;
+
+procedure TMainForm.ButtonSshConnectClick(Sender: TObject);
+var
+  OldCursor: TCursor;
+begin
+  // make connection first...
+  Self.FSshClient.HostName := Self.EditTR40HostIP.Text;
+  Self.FSshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+  Self.FSshClient.User := Self.EditTR40User.Text;
+  Self.FSshClient.Password := Self.EditTR40Pass.Text;
+
+  OldCursor := Screen.Cursor;
+  try
+    Screen.Cursor := crHourGlass;
+    if FSshClient.CanConnect then
+    begin
+      Self.ButtonSshConnect.ImageIndex := 1;
+    end
+    else
+    begin
+      Self.ButtonSshConnect.ImageIndex := 0;
+    end;
+  finally
+    Screen.Cursor := OldCursor;
+  end;
+
+  { on the case of using SecureBridge lib }
+  // Self.ScSSHClient1.HostName := Self.EditSshHost.Text;
+  // Self.ScSSHClient1.Port := 22;
+  // Self.ScSSHClient1.User := Self.EditUserName.Text;
+  // Self.ScSSHClient1.Password := Self.EditPassword.Text;
+  /// /   ScSSHClient1.Authentication := atPassword;
+  //
+  // OldCursor := Screen.Cursor;
+  // try
+  // Screen.Cursor := crHourGlass;
+  // ScSSHClient1.Connect;
+  // finally
+  // Screen.Cursor := OldCursor;
+  // end;
+  //
+  // if ScSSHClient1.Connected then
+  // begin
+  // // send cmds to change ip...
+  //
+  // // change button image
+  // Self.ButtonSshConnect.ImageIndex := 1;
+  // end
+  // else
+  // begin
+  // Self.ButtonSshConnect.ImageIndex := 0;
+  // end;
+end;
+
+procedure TMainForm.EditTR40PassRightButtonClick(Sender: TObject);
+begin
+  //
+  if Self.EditTR40Pass.RightButton.ImageIndex = 2 then
+  begin
+    Self.EditTR40Pass.PasswordChar := #0;
+    Self.EditTR40Pass.RightButton.ImageIndex := 3;
+  end
+  else if Self.EditTR40Pass.RightButton.ImageIndex = 3 then
+  begin
+    Self.EditTR40Pass.PasswordChar := '*';
+    Self.EditTR40Pass.RightButton.ImageIndex := 2;
+  end;
+end;
+
+procedure TMainForm.ButtonIO40PingClick(Sender: TObject);
+var
+  Ping: TIdIcmpClient;
+
+begin
+  Ping := TIdIcmpClient.Create(nil);
+  try
+    Ping.Host := Self.FDeviceManager.OP40.IPAddress;
+    Ping.Ping('0000');
+    if Ping.ReplyStatus.BytesReceived > 0 then
+      Self.ButtonIO40Ping.ImageIndex := 1
+    else
+      Self.ButtonIO40Ping.ImageIndex := 0;
+  finally
+    Ping.Free;
+  end;
+end;
+
+procedure TMainForm.ButtonIO40SetIPClick(Sender: TObject);
 begin
   //
 end;
 
 procedure TMainForm.ButtonTR40PingClick(Sender: TObject);
+var
+  OldCursor: TCursor;
+  Ping: TIdIcmpClient;
+  CurrIP: string;
 begin
-  if Self.ButtonTR40Ping.ImageIndex = 0 then
+  OldCursor := Screen.Cursor;
+  Screen.Cursor := crHourGlass;
+
+  CurrIP := Format('%s.%s.%s.%s', [EditTR40CurrIPOctet1.Text, EditTR40CurrIPOctet2.Text, EditTR40CurrIPOctet3.Text, EditTR40CurrIPOctet4.Text]);
+  if TryPing(CurrIP) then
     Self.ButtonTR40Ping.ImageIndex := 1
-  else if Self.ButtonTR40Ping.ImageIndex = 1 then
+  else
     Self.ButtonTR40Ping.ImageIndex := 0;
+
+  Screen.Cursor := OldCursor;
 end;
 
 procedure TMainForm.ButtonTR40SetIPClick(Sender: TObject);
+var
+  OldCursor: TCursor;
+  result: string;
+  lines, fields, names: TArray<string>;
+  line, name, ext: string;
+  newIP, newMask, newGate, cmd: string;
+  i: integer;
+  netConfigContents: TStringList;
+begin
+  OldCursor := Screen.Cursor;
+  if Self.FSshClient.Connected then
+  begin
+    Screen.Cursor := crHourGlass;
+    try
+      // get network interface name of ethernet:
+      // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
+      result := FSshClient.ExecuteCommand('nmcli device status');
+      result := result.Trim;
+      if result.Contains(#13#10) then
+      begin
+        lines := result.Split([#13#10]);
+      end
+      else if result.Contains(#10) then
+      begin
+        lines := result.Split([#10]);
+      end;
+
+      if Length(lines) > 0 then
+      begin
+        fields := lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
+        for i := 1 to Length(lines) - 1 do
+        begin
+          fields := lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
+          if fields[1].ToLower = 'ethernet' then
+          begin
+            Self.FDeviceManager.TR40.NetInterface := fields[0];
+            break;
+          end;
+        end;
+      end;
+
+      // get network config file name with extension ".yaml" : ls /etc/netplan
+      result := FSshClient.ExecuteCommand('ls /etc/netplan');
+      result := result.Trim;
+      names := result.Split([' '], TStringSplitOptions.ExcludeEmpty);
+      for name in names do
+      begin
+        ext := TPath.GetExtension(name).Trim;
+        if ext = '.yaml' then
+        begin
+          Self.FDeviceManager.TR40.NetConfigFileName := name;
+          break;
+        end;
+      end;
+
+      // run netplan config command to change with new ip address
+      newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
+      newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
+      { Here are some common subnet masks and their corresponding CIDR notations:
+        255.255.255.0 = /24
+        255.255.255.128 = /25
+        255.255.255.192 = /26
+        255.255.255.224 = /27
+        255.255.255.240 = /28
+        255.255.255.248 = /29
+        255.255.255.252 = /30
+        255.255.255.254 = /31
+        255.255.255.255 = /32
+
+        for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
+      }
+      newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
+      if newMask = '255.255.255.0' then
+        newMask := '/24'
+      else if newMask = '255.255.255.128' then
+        newMask := '/25'
+      else if newMask = '255.255.255.192' then
+        newMask := '/26'
+      else if newMask = '255.255.255.224' then
+        newMask := '/27'
+      else if newMask = '255.255.255.255' then
+        newMask := '/32'
+      else
+        newMask := '/24';
+
+      netConfigContents := TStringList.Create;
+      netConfigContents.Add(Format('network:', []));
+      netConfigContents.Add(Format('  version: 2', []));
+      netConfigContents.Add(Format('  renderer: networkd', []));
+      netConfigContents.Add(Format('  ethernets:', []));
+      netConfigContents.Add(Format('    %s:', [Self.FDeviceManager.TR40.NetInterface]));
+      netConfigContents.Add(Format('      dhcp4: no', []));
+      netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
+      // netConfigContents.Add(Format('      addresses:', []));
+      // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
+      netConfigContents.Add(Format('      gateway4: %s', [newGate]));
+      netConfigContents.Add(Format('      nameservers:', []));
+      netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
+
+      cmd := Format('echo "%s" | sudo tee /etc/netplan/%s', [netConfigContents.Text, Self.FDeviceManager.TR40.NetConfigFileName]);
+      result := Self.FSshClient.ExecuteCommand(cmd);
+      Sleep(1000);
+
+      // restart ssh server: sudo systemctl restart sshd
+      result := FSshClient.ExecuteCommand('sudo systemctl restart sshd');
+
+      // apply ip change: sudo netplan apply
+      result := FSshClient.ExecuteCommand('sudo netplan apply');
+
+      // check if the new ip applied...
+      if TryPing(newIP) then
+      begin
+        Self.FDeviceManager.TR40.IPAddress := newIP;
+        // Self.FDeviceManager.TR40.SubnetMask := ;
+        // Self.FDeviceManager.TR40.DefaultGateway := ;
+        Self.ButtonTR40SetIP.ImageIndex := 1;
+      end
+      else
+      begin
+        Self.ButtonTR40SetIP.ImageIndex := 0;
+      end;
+
+    finally
+
+    end;
+
+  end
+  else
+  begin
+    Self.ButtonTR40SetIP.ImageIndex := 0;
+  end;
+  Screen.Cursor := OldCursor;
+end;
+
+procedure TMainForm.EditPasswordChange(Sender: TObject);
+begin
+  //
+end;
+
+procedure TMainForm.EditTR40UserChange(Sender: TObject);
 begin
   //
 end;
 
 procedure TMainForm.OctetEditExit(Sender: TObject);
 var
-  minVal, maxVal, currVal: Integer;
+  minVal, maxVal, currVal: integer;
   editBox: TEdit;
 begin
   editBox := TEdit(Sender);
@@ -251,6 +585,12 @@ begin
   editBox.Text := currVal.ToString;
   //
 end;
+
+// procedure TMainForm.ScSSHClient1ServerKeyValidate(Sender: TObject; NewServerKey: TScKey; var Accept: Boolean);
+// begin
+// //
+// Accept := True;
+// end;
 
 procedure TMainForm.OctetChange(Sender: TObject);
 var
