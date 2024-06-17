@@ -116,6 +116,10 @@ type
     Label17: TLabel;
     LabelTR40ConnectionState: TLabel;
 
+    ImageTR40PingLed: TImage;
+    ImageTR40ConnectLed: TImage;
+    ImageTR40SetIPLed: TImage;
+
     procedure OctetEditExit(Sender: TObject);
     procedure OctetChange(Sender: TObject);
 
@@ -243,7 +247,7 @@ begin
 
   EditTR40Pass.RightButton.Enabled := True;
   EditTR40Pass.RightButton.Visible := True;
-  EditTR40Pass.RightButton.ImageIndex := 3; // closed eye
+  EditTR40Pass.RightButton.ImageIndex := 2; // closed eye
   EditTR40Pass.PasswordChar := '*';
 
   Self.PageControl.ActivePage := Self.SheetTR40;
@@ -373,6 +377,7 @@ end;
 procedure TMainForm.ButtonSshConnectClick(Sender: TObject);
 var
   OldCursor: TCursor;
+  bmp: TBitmap;
 begin
   // make connection first...
   Self.FSshClient.HostName := Self.EditTR40HostIP.Text;
@@ -380,19 +385,25 @@ begin
   Self.FSshClient.User := Self.EditTR40User.Text;
   Self.FSshClient.Password := Self.EditTR40Pass.Text;
 
+  bmp := TBitmap.Create;
   OldCursor := Screen.Cursor;
   try
     Screen.Cursor := crHourGlass;
     if FSshClient.CanConnect then
     begin
       Self.ButtonSshConnect.ImageIndex := 1;
+      Self.IconList.GetBitmap(1, bmp);
+      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
     end
     else
     begin
       Self.ButtonSshConnect.ImageIndex := 0;
+      Self.IconList.GetBitmap(0, bmp);
+      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
     end;
   finally
     Screen.Cursor := OldCursor;
+    bmp.Free;
   end;
 
   { on the case of using SecureBridge lib }
@@ -474,16 +485,29 @@ var
   OldCursor: TCursor;
   Ping: TIdIcmpClient;
   CurrIP: string;
+  bmp: TBitmap;
 begin
   OldCursor := Screen.Cursor;
   Screen.Cursor := crHourGlass;
 
+  bmp := TBitmap.Create;
   CurrIP := Format('%s.%s.%s.%s', [EditTR40CurrIPOctet1.Text, EditTR40CurrIPOctet2.Text, EditTR40CurrIPOctet3.Text, EditTR40CurrIPOctet4.Text]);
   if TryPing(CurrIP) then
-    Self.ButtonTR40Ping.ImageIndex := 1
+  begin
+    Self.ButtonTR40Ping.ImageIndex := 1;
+    Self.IconList.GetBitmap(1, bmp);
+    Self.ImageTR40PingLed.Picture.Assign(bmp);
+  end
   else
+  begin
     Self.ButtonTR40Ping.ImageIndex := 0;
+    Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40PingLed.Picture.Assign(bmp);
+  end;
 
+  bmp.Free;
+
+  Invalidate;
   Screen.Cursor := OldCursor;
 end;
 
@@ -497,11 +521,14 @@ var
   // newGate: string;
   i: integer;
   netConfigContents: TStringList;
+  bmp: TBitmap;
 begin
   OldCursor := Screen.Cursor;
-  if Self.FSshClient.Connected then
+  Screen.Cursor := crHourGlass;
+  if Self.FSshClient.CanConnect then
   begin
-    Screen.Cursor := crHourGlass;
+    bmp := TBitmap.Create;
+
     try
       // get network interface name of ethernet:
       // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
@@ -609,21 +636,31 @@ begin
         // Self.FDeviceManager.TR40.SubnetMask := ;
         // Self.FDeviceManager.TR40.DefaultGateway := ;
         Self.ButtonTR40SetIP.ImageIndex := 1;
+        Self.IconList.GetBitmap(1, bmp);
+        Self.ImageTR40SetIPLed.Picture.Assign(bmp);
+
+        //reload...
+        Self.FormShow(Self);
       end
       else
       begin
         Self.ButtonTR40SetIP.ImageIndex := 0;
+        Self.IconList.GetBitmap(0, bmp);
+        Self.ImageTR40SetIPLed.Picture.Assign(bmp);
       end;
 
     finally
-
+      bmp.Free;
     end;
 
   end
   else
   begin
     Self.ButtonTR40SetIP.ImageIndex := 0;
+    Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40SetIPLed.Picture.Assign(bmp);
   end;
+
   Screen.Cursor := OldCursor;
 end;
 
