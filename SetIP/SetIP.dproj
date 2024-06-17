@@ -106,6 +106,7 @@
         <DCCReference Include="Service\uPuttySshClient.pas"/>
         <DCCReference Include="Service\uOpenSshClient.pas"/>
         <DCCReference Include="uCommonUtils.pas"/>
+        <DCCReference Include="Service\DosCommand.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

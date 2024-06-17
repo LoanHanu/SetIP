@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'MainForm'
-  ClientHeight = 562
-  ClientWidth = 388
+  ClientHeight = 561
+  ClientWidth = 805
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -32,25 +32,24 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 388
-    Height = 562
-    ActivePage = SheetIO40
+    Width = 805
+    Height = 561
+    ActivePage = SheetTR40
     Align = alClient
     TabOrder = 0
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        380
-        532)
+        797
+        531)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 366
+        Width = 779
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
-        ExplicitWidth = 362
         object Label1: TLabel
           AlignWithMargins = True
           Left = 5
@@ -248,12 +247,11 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 366
-        Height = 153
+        Width = 779
+        Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
-        ExplicitWidth = 362
         object Label2: TLabel
           AlignWithMargins = True
           Left = 5
@@ -292,6 +290,7 @@ object MainForm: TMainForm
           Margins.Bottom = 5
           Alignment = taCenter
           Caption = 'Default Gateway: '
+          Visible = False
         end
         object Panel2: TPanel
           Left = 105
@@ -619,7 +618,9 @@ object MainForm: TMainForm
           BevelOuter = bvNone
           BorderWidth = 1
           BorderStyle = bsSingle
+          Enabled = False
           TabOrder = 2
+          Visible = False
           object EditTR40NewGateOctet4: TEdit
             AlignWithMargins = True
             Left = 118
@@ -773,7 +774,7 @@ object MainForm: TMainForm
         object ButtonTR40SetIP: TButton
           AlignWithMargins = True
           Left = 283
-          Top = 100
+          Top = 60
           Width = 80
           Height = 25
           Margins.Left = 10
@@ -795,12 +796,11 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 366
+        Width = 779
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
-        ExplicitWidth = 362
         object Label10: TLabel
           Left = 3
           Top = 16
@@ -835,6 +835,28 @@ object MainForm: TMainForm
           Width = 53
           Height = 15
           Caption = 'Password:'
+        end
+        object Label15: TLabel
+          Left = 392
+          Top = 16
+          Width = 187
+          Height = 15
+          Caption = 'Output(file list in home for testing):'
+        end
+        object Label17: TLabel
+          Left = 392
+          Top = 180
+          Width = 34
+          Height = 15
+          Caption = 'Input: '
+        end
+        object LabelTR40ConnectionState: TLabel
+          Left = 264
+          Top = 181
+          Width = 41
+          Height = 15
+          Caption = 'Ready...'
+          Visible = False
         end
         object RadioButton1: TRadioButton
           Left = 6
@@ -890,7 +912,7 @@ object MainForm: TMainForm
           OnChange = EditTR40UserChange
         end
         object ButtonSshConnect: TButton
-          Left = 105
+          Left = 27
           Top = 176
           Width = 173
           Height = 25
@@ -912,18 +934,44 @@ object MainForm: TMainForm
           TabOrder = 7
           OnRightButtonClick = EditTR40PassRightButtonClick
         end
+        object MemoTR40Output: TMemo
+          Left = 392
+          Top = 37
+          Width = 385
+          Height = 132
+          Enabled = False
+          TabOrder = 8
+        end
+        object EditTR40Input: TEdit
+          Left = 439
+          Top = 176
+          Width = 257
+          Height = 23
+          Enabled = False
+          TabOrder = 9
+        end
+        object ButtonTR40Input: TButton
+          Left = 702
+          Top = 175
+          Width = 75
+          Height = 25
+          Caption = 'Input'
+          Enabled = False
+          TabOrder = 10
+          OnClick = ButtonTR40InputClick
+        end
       end
     end
     object SheetIO40: TTabSheet
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        380
-        532)
+        797
+        531)
       object GroupBox3: TGroupBox
         Left = 3
         Top = 3
-        Width = 358
+        Width = 771
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -1129,7 +1177,7 @@ object MainForm: TMainForm
       object GroupBox4: TGroupBox
         Left = 3
         Top = 63
-        Width = 358
+        Width = 771
         Height = 218
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -1172,6 +1220,7 @@ object MainForm: TMainForm
           Margins.Bottom = 5
           Alignment = taCenter
           Caption = 'Default Gateway: '
+          Visible = False
         end
         object Panel6: TPanel
           Left = 105
@@ -1201,7 +1250,6 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '2'
-            ExplicitTop = 9
           end
           object Edit15: TEdit
             AlignWithMargins = True
@@ -1501,6 +1549,7 @@ object MainForm: TMainForm
           BorderWidth = 1
           BorderStyle = bsSingle
           TabOrder = 2
+          Visible = False
           object EditIO40NewGateOctet4: TEdit
             AlignWithMargins = True
             Left = 118
@@ -1653,8 +1702,8 @@ object MainForm: TMainForm
         end
         object ButtonIO40SetIP: TButton
           AlignWithMargins = True
-          Left = 275
-          Top = 99
+          Left = 283
+          Top = 59
           Width = 80
           Height = 25
           Margins.Left = 10

@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, System.ImageList, Vcl.ImgList, Vcl.ExtCtrls,
   IdIcmpClient, IdComponent, Vcl.Mask, System.IOUtils, System.Generics.Collections,
-  uDevice, uPuttySshClient;
+  uDevice, uPuttySshClient, DosCommand;
 
 type
   TMainForm = class(TForm)
@@ -109,6 +109,12 @@ type
     Label14: TLabel;
     ButtonSshConnect: TButton;
     EditTR40Pass: TButtonedEdit;
+    MemoTR40Output: TMemo;
+    Label15: TLabel;
+    EditTR40Input: TEdit;
+    ButtonTR40Input: TButton;
+    Label17: TLabel;
+    LabelTR40ConnectionState: TLabel;
 
     procedure OctetEditExit(Sender: TObject);
     procedure OctetChange(Sender: TObject);
@@ -130,6 +136,11 @@ type
     procedure EditPasswordChange(Sender: TObject);
     procedure EditTR40PassRightButtonClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+
+    procedure SshClientDosCommandStarted(Sender: TObject);
+    procedure SshClientDosCommandNewLine(ASender: TObject; const ANewLine: string; AOutputType: TOutputType);
+    procedure SshClientDosCommandTerminated(Sender: TObject);
+    procedure ButtonTR40InputClick(Sender: TObject);
   private
     FDeviceManager: TDeviceManager;
     FSshClient: TPuttySshClient;
@@ -240,6 +251,9 @@ begin
   Self.FDeviceManager := TDeviceManager.Create;
   // Self.FDeviceManager.LoadFromFile;
   Self.FSshClient := TPuttySshClient.Create;
+  Self.FSshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  Self.FSshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  Self.FSshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
 
 end;
 
@@ -308,6 +322,52 @@ begin
     Self.EditIO40CurrIPOctet4.Text := octets[3];
   end;
 {$ENDREGION}
+end;
+
+procedure TMainForm.SshClientDosCommandStarted(Sender: TObject);
+begin
+  if Self.PageControl.ActivePage = Self.SheetTR40 then
+  begin
+    Self.MemoTR40Output.Enabled := True;
+    Self.ButtonTR40Input.Enabled := True;
+    Self.EditTR40Input.Enabled := True;
+
+    Self.LabelTR40ConnectionState.Visible := True;
+    Self.LabelTR40ConnectionState.Caption := 'Connecting...';
+
+    Self.MemoTR40Output.Lines.Clear;
+
+  end
+  else if Self.PageControl.ActivePage = Self.SheetIO40 then
+  begin
+  end;
+end;
+
+procedure TMainForm.SshClientDosCommandNewLine(ASender: TObject; const ANewLine: string; AOutputType: TOutputType);
+begin
+  if Self.PageControl.ActivePage = Self.SheetTR40 then
+  begin
+    Self.MemoTR40Output.Lines.Add(ANewLine);
+  end
+  else if Self.PageControl.ActivePage = Self.SheetIO40 then
+  begin
+  end;
+
+end;
+
+procedure TMainForm.SshClientDosCommandTerminated(Sender: TObject);
+begin
+  if Self.PageControl.ActivePage = Self.SheetTR40 then
+  begin
+    Self.MemoTR40Output.Enabled := False;
+    Self.EditTR40Input.Enabled := False;
+    Self.ButtonTR40Input.Enabled := False;
+
+    Self.LabelTR40ConnectionState.Visible := False;
+  end
+  else if Self.PageControl.ActivePage = Self.SheetIO40 then
+  begin
+  end;
 end;
 
 procedure TMainForm.ButtonSshConnectClick(Sender: TObject);
@@ -401,6 +461,14 @@ begin
   //
 end;
 
+procedure TMainForm.ButtonTR40InputClick(Sender: TObject);
+begin
+  if FSshClient.DosCommand.IsRunning then
+  begin
+    FSshClient.DosCommand.SendLine(Self.EditTR40Input.Text, True);
+  end;
+end;
+
 procedure TMainForm.ButtonTR40PingClick(Sender: TObject);
 var
   OldCursor: TCursor;
@@ -423,9 +491,10 @@ procedure TMainForm.ButtonTR40SetIPClick(Sender: TObject);
 var
   OldCursor: TCursor;
   result: string;
-  lines, fields, names: TArray<string>;
+  Lines, fields, names: TArray<string>;
   line, name, ext: string;
-  newIP, newMask, newGate, cmd: string;
+  newIP, newMask, cmd: string;
+  // newGate: string;
   i: integer;
   netConfigContents: TStringList;
 begin
@@ -440,19 +509,19 @@ begin
       result := result.Trim;
       if result.Contains(#13#10) then
       begin
-        lines := result.Split([#13#10]);
+        Lines := result.Split([#13#10]);
       end
       else if result.Contains(#10) then
       begin
-        lines := result.Split([#10]);
+        Lines := result.Split([#10]);
       end;
 
-      if Length(lines) > 0 then
+      if Length(Lines) > 0 then
       begin
-        fields := lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
-        for i := 1 to Length(lines) - 1 do
+        fields := Lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
+        for i := 1 to Length(Lines) - 1 do
         begin
-          fields := lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
+          fields := Lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
           if fields[1].ToLower = 'ethernet' then
           begin
             Self.FDeviceManager.TR40.NetInterface := fields[0];
@@ -467,17 +536,21 @@ begin
       names := result.Split([' '], TStringSplitOptions.ExcludeEmpty);
       for name in names do
       begin
-        ext := TPath.GetExtension(name).Trim;
-        if ext = '.yaml' then
-        begin
-          Self.FDeviceManager.TR40.NetConfigFileName := name;
-          break;
+        try
+          ext := TPath.GetExtension(name).Trim;
+          if ext = '.yaml' then
+          begin
+            Self.FDeviceManager.TR40.NetConfigFileName := name;
+            break;
+          end;
+        finally
+
         end;
       end;
 
       // run netplan config command to change with new ip address
       newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
-      newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
+      // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
       { Here are some common subnet masks and their corresponding CIDR notations:
         255.255.255.0 = /24
         255.255.255.128 = /25
@@ -515,7 +588,7 @@ begin
       netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
       // netConfigContents.Add(Format('      addresses:', []));
       // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
-      netConfigContents.Add(Format('      gateway4: %s', [newGate]));
+      // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
       netConfigContents.Add(Format('      nameservers:', []));
       netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
 

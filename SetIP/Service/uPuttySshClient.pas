@@ -3,7 +3,7 @@ unit uPuttySshClient;
 interface
 
 uses
-  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs;
+  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs, DosCommand;
 
 type
   TSshConnectionOption = (scoPassword, scoPubicKey);
@@ -22,6 +22,7 @@ type
     FConnected: Boolean;
     FConnectionOption: TSshConnectionOption;
     FLockConnection: TCriticalSection;
+    FDosCommand: TDosCommand;
 
   public
     constructor Create;
@@ -29,12 +30,14 @@ type
 
     function CanConnect: Boolean;
 
+    // function ChangeIP(newIP: string): Boolean;
+
     function IsPuttyInstalled: Boolean;
 
     /// <summary>
     /// execute cmd on remote machine, ssh server
     /// </summary>
-    function ExecuteCommand(cmd: string): string;
+    function ExecuteCommand(cmd: string; inBatch: Boolean = True): string;
 
   public
     property PlinkPath: string read FPlinkPath write FPlinkPath;
@@ -45,6 +48,9 @@ type
     property PrivateKey: string read FPrivateKey write FPrivateKey;
     property Connected: Boolean read FConnected write FConnected;
     property ConnectionOption: TSshConnectionOption read FConnectionOption write FConnectionOption;
+
+  published
+    property DosCommand: TDosCommand read FDosCommand;
 
   end;
 
@@ -61,6 +67,7 @@ begin
   FConnected := False;
   FConnectionOption := scoPassword;
   FLockConnection := TCriticalSection.Create;
+  FDosCommand := TDosCommand.Create(nil);
 end;
 
 destructor TPuttySshClient.Destroy;
@@ -68,6 +75,7 @@ begin
   inherited;
 
   FLockConnection.Free;
+  FDosCommand.Free;
 end;
 
 function TPuttySshClient.IsPuttyInstalled: Boolean;
@@ -126,7 +134,7 @@ begin
     scoPassword:
       begin
         cmdResult := ExecuteCommand('ls');
-        if cmdResult.Contains('FATAL ERROR') then // or
+        if cmdResult.ToLower.Contains('error') then // or
         begin
           if cmdResult.Contains('Network error: Connection timed out') then
           begin
@@ -139,6 +147,11 @@ begin
           else if cmdResult.Contains('Configured password was not accepted') then
           begin
             ShowMessage(cmdResult + #13#10 + 'Please check if user name or password is correct.');
+          end
+          else if cmdResult.Contains('Cannot confirm a host key in batch mode') then
+          begin
+            cmdResult := ExecuteCommand('ls', False);
+            // ShowMessage(cmdResult);
           end
           else
           begin
@@ -161,27 +174,46 @@ begin
   Result := res;
 end;
 
-function TPuttySshClient.ExecuteCommand(cmd: string): string;
+function TPuttySshClient.ExecuteCommand(cmd: string; inBatch: Boolean = True): string;
 var
   res: string;
   commandLine: string;
-  output: TStringList;
+  output, input: TStringList;
 begin
   res := '';
 
   output := TStringList.Create;
+  input := TStringList.Create;
 
   output.Text := cmd;
   output.SaveToFile('cmd.txt');
 
-  // commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch %s', [FPlinkPath, FHostName, FPort, FUser, FPassword, cmd]);
-  commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch -m cmd.txt', [FPlinkPath, FHostName, FPort, FUser, FPassword]);
-  try
-    output.Clear;
-    ExecuteCommandLine(commandLine, output);
-    res := output.Text;
-  finally
-    output.Free;
+  if inBatch then
+  begin
+    // commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch %s', [FPlinkPath, FHostName, FPort, FUser, FPassword, cmd]);
+    commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch -m cmd.txt', [FPlinkPath, FHostName, FPort, FUser, FPassword]);
+    try
+      output.Clear;
+      ExecuteCommandLine(commandLine, output);
+      res := output.Text;
+    finally
+      output.Free;
+    end;
+  end
+  else
+  begin
+    input.Add('y'); // for yes
+    commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -m cmd.txt', [FPlinkPath, FHostName, FPort, FUser, FPassword]);
+    try
+      output.Clear;
+      // ExecuteCommandLine2(commandLine, output, input);
+      Self.FDosCommand.commandLine := commandLine;
+      Self.FDosCommand.Execute;
+
+      res := output.Text;
+    finally
+      output.Free;
+    end;
   end;
 
   Result := res;

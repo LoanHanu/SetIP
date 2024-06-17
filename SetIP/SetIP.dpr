@@ -6,7 +6,8 @@ uses
   uDevice in 'Devices\uDevice.pas',
   uPuttySshClient in 'Service\uPuttySshClient.pas',
   uOpenSshClient in 'Service\uOpenSshClient.pas',
-  uCommonUtils in 'uCommonUtils.pas';
+  uCommonUtils in 'uCommonUtils.pas',
+  DosCommand in 'Service\DosCommand.pas';
 
 {$R *.res}
 
