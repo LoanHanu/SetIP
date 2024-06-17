@@ -600,6 +600,14 @@ begin
         newMask := '/26'
       else if newMask = '255.255.255.224' then
         newMask := '/27'
+      else if newMask = '255.255.255.240' then
+        newMask := '/28'
+      else if newMask = '255.255.255.248' then
+        newMask := '/29'
+      else if newMask = '255.255.255.252' then
+        newMask := '/30'
+      else if newMask = '255.255.255.254' then
+        newMask := '/31'
       else if newMask = '255.255.255.255' then
         newMask := '/32'
       else
@@ -639,7 +647,7 @@ begin
         Self.IconList.GetBitmap(1, bmp);
         Self.ImageTR40SetIPLed.Picture.Assign(bmp);
 
-        //reload...
+        // reload...
         Self.FormShow(Self);
       end
       else
