@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'MainForm'
-  ClientHeight = 561
-  ClientWidth = 797
+  ClientHeight = 562
+  ClientWidth = 813
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -32,24 +32,27 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 797
-    Height = 561
+    Width = 813
+    Height = 562
     ActivePage = SheetTR40
     Align = alClient
     TabOrder = 0
+    ExplicitWidth = 809
+    ExplicitHeight = 561
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        789
-        531)
+        805
+        532)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 771
+        Width = 783
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
+        ExplicitWidth = 779
         object Label1: TLabel
           AlignWithMargins = True
           Left = 5
@@ -255,11 +258,12 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 771
+        Width = 783
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
+        ExplicitWidth = 779
         object Label2: TLabel
           AlignWithMargins = True
           Left = 5
@@ -812,11 +816,12 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 771
+        Width = 783
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
+        ExplicitWidth = 779
         object Label10: TLabel
           Left = 3
           Top = 16
@@ -855,9 +860,9 @@ object MainForm: TMainForm
         object Label15: TLabel
           Left = 392
           Top = 16
-          Width = 187
+          Width = 198
           Height = 15
-          Caption = 'Output(file list in home for testing):'
+          Caption = 'Output(the case of caching host key):'
         end
         object Label17: TLabel
           Left = 392
@@ -935,7 +940,7 @@ object MainForm: TMainForm
           TabOrder = 5
           OnChange = EditTR40UserChange
         end
-        object ButtonSshConnect: TButton
+        object ButtonTR40SshConnect: TButton
           Left = 27
           Top = 176
           Width = 173
@@ -944,7 +949,7 @@ object MainForm: TMainForm
           ImageIndex = 0
           Images = IconList
           TabOrder = 6
-          OnClick = ButtonSshConnectClick
+          OnClick = ButtonTR40SshConnectClick
         end
         object EditTR40Pass: TButtonedEdit
           Left = 105
@@ -963,7 +968,8 @@ object MainForm: TMainForm
           Top = 37
           Width = 385
           Height = 132
-          Enabled = False
+          ReadOnly = True
+          ScrollBars = ssBoth
           TabOrder = 8
         end
         object EditTR40Input: TEdit
@@ -990,12 +996,12 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        789
-        531)
+        805
+        532)
       object GroupBox3: TGroupBox
         Left = 3
         Top = 3
-        Width = 763
+        Width = 775
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -1201,7 +1207,7 @@ object MainForm: TMainForm
       object GroupBox4: TGroupBox
         Left = 3
         Top = 63
-        Width = 763
+        Width = 775
         Height = 218
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'

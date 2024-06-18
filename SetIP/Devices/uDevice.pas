@@ -11,6 +11,7 @@ type
     FSshPort: integer;
     FUser: string;
     FPassword: string;
+
     FNetInterface: string; // eth0 or enp0s3 or other...
     FNetConfigFileName: string;
 

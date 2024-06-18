@@ -3,7 +3,7 @@ unit uCommonUtils;
 interface
 
 uses
-  Windows, Classes, SysUtils, IdIcmpClient;
+  Windows, Classes, SysUtils, IdIcmpClient, Vcl.Dialogs;
 
 procedure ExecuteCommandLine(Command: string; Output: TStrings);
 
@@ -175,6 +175,7 @@ var
 begin
   res := False;
   Ping := TIdIcmpClient.Create(nil);
+  Ping.ReceiveTimeout := 3000; // 5s
 
   try
     Ping.Host := HostIP;
@@ -209,7 +210,11 @@ begin
     else
       res := False;
   except
-    res := False;
+    on E: Exception do
+    begin
+      res := False;
+      ShowMessage('An exception occurred: ' + E.Message);
+    end;
   end;
 
   Ping.Free;

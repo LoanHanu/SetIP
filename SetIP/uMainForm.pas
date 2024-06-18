@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, System.ImageList, Vcl.ImgList, Vcl.ExtCtrls,
   IdIcmpClient, IdComponent, Vcl.Mask, System.IOUtils, System.Generics.Collections,
-  uDevice, uPuttySshClient, DosCommand;
+  uDevice, uPuttySshClient, DosCommand, IdBaseComponent, IdRawBase, IdRawClient;
 
 type
   TMainForm = class(TForm)
@@ -107,7 +107,7 @@ type
     Label12: TLabel;
     Label13: TLabel;
     Label14: TLabel;
-    ButtonSshConnect: TButton;
+    ButtonTR40SshConnect: TButton;
     EditTR40Pass: TButtonedEdit;
     MemoTR40Output: TMemo;
     Label15: TLabel;
@@ -135,7 +135,7 @@ type
 
     // procedure ScSSHClient1ServerKeyValidate(Sender: TObject; NewServerKey: TScKey; var Accept: Boolean);
 
-    procedure ButtonSshConnectClick(Sender: TObject);
+    procedure ButtonTR40SshConnectClick(Sender: TObject);
     procedure EditTR40UserChange(Sender: TObject);
     procedure EditPasswordChange(Sender: TObject);
     procedure EditTR40PassRightButtonClick(Sender: TObject);
@@ -255,9 +255,9 @@ begin
   Self.FDeviceManager := TDeviceManager.Create;
   // Self.FDeviceManager.LoadFromFile;
   Self.FSshClient := TPuttySshClient.Create;
-  Self.FSshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
-  Self.FSshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
-  Self.FSshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
+  Self.FSshClient.DosCommandOnStarted := SshClientDosCommandStarted;
+  Self.FSshClient.DosCommandOnNewLine := SshClientDosCommandNewLine;
+  Self.FSshClient.DosCommandOnTerminated := SshClientDosCommandTerminated;
 
 end;
 
@@ -352,6 +352,12 @@ begin
   if Self.PageControl.ActivePage = Self.SheetTR40 then
   begin
     Self.MemoTR40Output.Lines.Add(ANewLine);
+    // if ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
+    // begin
+    // Self.EditTR40Input.Text := 'y';
+    // ShowMessage('Please type "y" and click button "Input" to cach host key');
+    // end;
+
   end
   else if Self.PageControl.ActivePage = Self.SheetIO40 then
   begin
@@ -363,7 +369,7 @@ procedure TMainForm.SshClientDosCommandTerminated(Sender: TObject);
 begin
   if Self.PageControl.ActivePage = Self.SheetTR40 then
   begin
-    Self.MemoTR40Output.Enabled := False;
+    // Self.MemoTR40Output.Enabled := False;
     Self.EditTR40Input.Enabled := False;
     Self.ButtonTR40Input.Enabled := False;
 
@@ -374,7 +380,7 @@ begin
   end;
 end;
 
-procedure TMainForm.ButtonSshConnectClick(Sender: TObject);
+procedure TMainForm.ButtonTR40SshConnectClick(Sender: TObject);
 var
   OldCursor: TCursor;
   bmp: TBitmap;
@@ -391,13 +397,13 @@ begin
     Screen.Cursor := crHourGlass;
     if FSshClient.CanConnect then
     begin
-      Self.ButtonSshConnect.ImageIndex := 1;
+      Self.ButtonTR40SshConnect.ImageIndex := 1;
       Self.IconList.GetBitmap(1, bmp);
       Self.ImageTR40ConnectLed.Picture.Assign(bmp);
     end
     else
     begin
-      Self.ButtonSshConnect.ImageIndex := 0;
+      Self.ButtonTR40SshConnect.ImageIndex := 0;
       Self.IconList.GetBitmap(0, bmp);
       Self.ImageTR40ConnectLed.Picture.Assign(bmp);
     end;
@@ -474,9 +480,9 @@ end;
 
 procedure TMainForm.ButtonTR40InputClick(Sender: TObject);
 begin
-  if FSshClient.DosCommand.IsRunning then
+  if FSshClient.DosCommandIsRunning then
   begin
-    FSshClient.DosCommand.SendLine(Self.EditTR40Input.Text, True);
+    FSshClient.SendLineToDosCommand(Self.EditTR40Input.Text, True);
   end;
 end;
 
@@ -525,10 +531,11 @@ var
 begin
   OldCursor := Screen.Cursor;
   Screen.Cursor := crHourGlass;
-  if Self.FSshClient.CanConnect then
-  begin
-    bmp := TBitmap.Create;
 
+  bmp := TBitmap.Create;
+
+  if Self.FSshClient.Connected then
+  begin
     try
       // get network interface name of ethernet:
       // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
@@ -637,15 +644,30 @@ begin
       // apply ip change: sudo netplan apply
       result := FSshClient.ExecuteCommand('sudo netplan apply');
 
+      // set set ip led on
+      Self.ButtonTR40SetIP.ImageIndex := 1;
+      Self.IconList.GetBitmap(1, bmp);
+      Self.ImageTR40SetIPLed.Picture.Assign(bmp);
+
+      ShowMessage('New IP address applied');
+
       // check if the new ip applied...
       if TryPing(newIP) then
       begin
-        Self.FDeviceManager.TR40.IPAddress := newIP;
-        // Self.FDeviceManager.TR40.SubnetMask := ;
-        // Self.FDeviceManager.TR40.DefaultGateway := ;
-        Self.ButtonTR40SetIP.ImageIndex := 1;
+        // set ping led on
+        Self.ButtonTR40Ping.ImageIndex := 1;
         Self.IconList.GetBitmap(1, bmp);
-        Self.ImageTR40SetIPLed.Picture.Assign(bmp);
+        Self.ImageTR40PingLed.Picture.Assign(bmp);
+
+        ShowMessage('Ping succeeded on New IP address');
+
+        Self.FDeviceManager.TR40.IPAddress := newIP;
+        Self.FSshClient.Connected := False; // set to False on new IP
+
+        // Set connect led off
+        Self.ButtonTR40SshConnect.ImageIndex := 0;
+        Self.IconList.GetBitmap(0, bmp);
+        Self.ImageTR40ConnectLed.Picture.Assign(bmp);
 
         // reload...
         Self.FormShow(Self);
@@ -658,7 +680,7 @@ begin
       end;
 
     finally
-      bmp.Free;
+
     end;
 
   end
@@ -667,8 +689,20 @@ begin
     Self.ButtonTR40SetIP.ImageIndex := 0;
     Self.IconList.GetBitmap(0, bmp);
     Self.ImageTR40SetIPLed.Picture.Assign(bmp);
+
+    // set ping & connection leds to off
+    Self.ButtonTR40Ping.ImageIndex := 0;
+    // Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40PingLed.Picture.Assign(bmp);
+
+    Self.ButtonTR40SshConnect.ImageIndex := 0;
+    // Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+
+    ShowMessage('Not connected yet. Please try connect first.');
   end;
 
+  bmp.Free;
   Screen.Cursor := OldCursor;
 end;
 
