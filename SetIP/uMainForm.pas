@@ -385,7 +385,6 @@ var
   OldCursor: TCursor;
   bmp: TBitmap;
 begin
-  // make connection first...
   Self.FSshClient.HostName := Self.EditTR40HostIP.Text;
   Self.FSshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
   Self.FSshClient.User := Self.EditTR40User.Text;
@@ -412,32 +411,6 @@ begin
     bmp.Free;
   end;
 
-  { on the case of using SecureBridge lib }
-  // Self.ScSSHClient1.HostName := Self.EditSshHost.Text;
-  // Self.ScSSHClient1.Port := 22;
-  // Self.ScSSHClient1.User := Self.EditUserName.Text;
-  // Self.ScSSHClient1.Password := Self.EditPassword.Text;
-  /// /   ScSSHClient1.Authentication := atPassword;
-  //
-  // OldCursor := Screen.Cursor;
-  // try
-  // Screen.Cursor := crHourGlass;
-  // ScSSHClient1.Connect;
-  // finally
-  // Screen.Cursor := OldCursor;
-  // end;
-  //
-  // if ScSSHClient1.Connected then
-  // begin
-  // // send cmds to change ip...
-  //
-  // // change button image
-  // Self.ButtonSshConnect.ImageIndex := 1;
-  // end
-  // else
-  // begin
-  // Self.ButtonSshConnect.ImageIndex := 0;
-  // end;
 end;
 
 procedure TMainForm.EditTR40PassRightButtonClick(Sender: TObject);
@@ -536,151 +509,32 @@ begin
 
   if Self.FSshClient.Connected then
   begin
-    try
-      // get network interface name of ethernet:
-      // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
-      result := FSshClient.ExecuteCommand('nmcli device status');
-      result := result.Trim;
-      if result.Contains(#13#10) then
-      begin
-        Lines := result.Split([#13#10]);
-      end
-      else if result.Contains(#10) then
-      begin
-        Lines := result.Split([#10]);
-      end;
-
-      if Length(Lines) > 0 then
-      begin
-        fields := Lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
-        for i := 1 to Length(Lines) - 1 do
-        begin
-          fields := Lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
-          if fields[1].ToLower = 'ethernet' then
-          begin
-            Self.FDeviceManager.TR40.NetInterface := fields[0];
-            break;
-          end;
-        end;
-      end;
-
-      // get network config file name with extension ".yaml" : ls /etc/netplan
-      result := FSshClient.ExecuteCommand('ls /etc/netplan');
-      result := result.Trim;
-      names := result.Split([' '], TStringSplitOptions.ExcludeEmpty);
-      for name in names do
-      begin
-        try
-          ext := TPath.GetExtension(name).Trim;
-          if ext = '.yaml' then
-          begin
-            Self.FDeviceManager.TR40.NetConfigFileName := name;
-            break;
-          end;
-        finally
-
-        end;
-      end;
-
-      // run netplan config command to change with new ip address
-      newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
-      // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
-      { Here are some common subnet masks and their corresponding CIDR notations:
-        255.255.255.0 = /24
-        255.255.255.128 = /25
-        255.255.255.192 = /26
-        255.255.255.224 = /27
-        255.255.255.240 = /28
-        255.255.255.248 = /29
-        255.255.255.252 = /30
-        255.255.255.254 = /31
-        255.255.255.255 = /32
-
-        for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
-      }
-      newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
-      if newMask = '255.255.255.0' then
-        newMask := '/24'
-      else if newMask = '255.255.255.128' then
-        newMask := '/25'
-      else if newMask = '255.255.255.192' then
-        newMask := '/26'
-      else if newMask = '255.255.255.224' then
-        newMask := '/27'
-      else if newMask = '255.255.255.240' then
-        newMask := '/28'
-      else if newMask = '255.255.255.248' then
-        newMask := '/29'
-      else if newMask = '255.255.255.252' then
-        newMask := '/30'
-      else if newMask = '255.255.255.254' then
-        newMask := '/31'
-      else if newMask = '255.255.255.255' then
-        newMask := '/32'
-      else
-        newMask := '/24';
-
-      netConfigContents := TStringList.Create;
-      netConfigContents.Add(Format('network:', []));
-      netConfigContents.Add(Format('  version: 2', []));
-      netConfigContents.Add(Format('  renderer: networkd', []));
-      netConfigContents.Add(Format('  ethernets:', []));
-      netConfigContents.Add(Format('    %s:', [Self.FDeviceManager.TR40.NetInterface]));
-      netConfigContents.Add(Format('      dhcp4: no', []));
-      netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
-      // netConfigContents.Add(Format('      addresses:', []));
-      // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
-      // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
-      netConfigContents.Add(Format('      nameservers:', []));
-      netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
-
-      cmd := Format('echo "%s" | sudo tee /etc/netplan/%s', [netConfigContents.Text, Self.FDeviceManager.TR40.NetConfigFileName]);
-      result := Self.FSshClient.ExecuteCommand(cmd);
-      Sleep(1000);
-
-      // restart ssh server: sudo systemctl restart sshd
-      result := FSshClient.ExecuteCommand('sudo systemctl restart sshd');
-
-      // apply ip change: sudo netplan apply
-      result := FSshClient.ExecuteCommand('sudo netplan apply');
+    newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
+    // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
+    newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
+    if Self.FSshClient.ChangeIP(newIP, newMask) then
+    begin
+      // // set ping led on
+      // Self.ButtonTR40Ping.ImageIndex := 1;
+      // Self.IconList.GetBitmap(1, bmp);
+      // Self.ImageTR40PingLed.Picture.Assign(bmp);
 
       // set set ip led on
       Self.ButtonTR40SetIP.ImageIndex := 1;
       Self.IconList.GetBitmap(1, bmp);
       Self.ImageTR40SetIPLed.Picture.Assign(bmp);
 
-      ShowMessage('New IP address applied');
+      Self.FDeviceManager.TR40.IPAddress := newIP;
+      Self.FDeviceManager.TR40.SubnetMask := newMask;
+      Self.FSshClient.Connected := False; // set to False on new IP
+      //
+      // Set connect led off
+      Self.ButtonTR40SshConnect.ImageIndex := 0;
+      Self.IconList.GetBitmap(0, bmp);
+      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
 
-      // check if the new ip applied...
-      if TryPing(newIP) then
-      begin
-        // set ping led on
-        Self.ButtonTR40Ping.ImageIndex := 1;
-        Self.IconList.GetBitmap(1, bmp);
-        Self.ImageTR40PingLed.Picture.Assign(bmp);
-
-        ShowMessage('Ping succeeded on New IP address');
-
-        Self.FDeviceManager.TR40.IPAddress := newIP;
-        Self.FSshClient.Connected := False; // set to False on new IP
-
-        // Set connect led off
-        Self.ButtonTR40SshConnect.ImageIndex := 0;
-        Self.IconList.GetBitmap(0, bmp);
-        Self.ImageTR40ConnectLed.Picture.Assign(bmp);
-
-        // reload...
-        Self.FormShow(Self);
-      end
-      else
-      begin
-        Self.ButtonTR40SetIP.ImageIndex := 0;
-        Self.IconList.GetBitmap(0, bmp);
-        Self.ImageTR40SetIPLed.Picture.Assign(bmp);
-      end;
-
-    finally
-
+      // reload...
+      Self.FormShow(Self);
     end;
 
   end

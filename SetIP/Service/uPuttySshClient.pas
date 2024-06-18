@@ -3,7 +3,7 @@ unit uPuttySshClient;
 interface
 
 uses
-  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs, DosCommand;
+  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs, System.IOUtils, DosCommand;
 
 type
   TSshConnectionOption = (coPassword, coPubicKey);
@@ -40,7 +40,7 @@ type
 
     function CanConnect: Boolean;
 
-    // function ChangeIP(newIP: string): Boolean;
+    function ChangeIP(newIP, newMask: string; newGate: string = ''): Boolean;
 
     /// <summary>
     /// execute cmd on remote machine, ssh server
@@ -238,6 +238,151 @@ begin
   end;
 
   FConnected := res;
+  Result := res;
+end;
+
+function TPuttySshClient.ChangeIP(newIP, newMask: string; newGate: string = ''): Boolean;
+var
+  res: Boolean;
+  cmdResult: string;
+  netInterface, netConfigFileName: string;
+  Lines, fields, names: TArray<string>;
+  line, name, ext: string;
+  cmd: string;
+  // newGate: string;
+  i: integer;
+  netConfigContents: TStringList;
+begin
+  res := False;
+  if Self.Connected then
+  begin
+    try
+      // get network interface name of ethernet:
+      // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
+      cmdResult := ExecuteCommand('nmcli device status');
+      cmdResult := cmdResult.Trim;
+      if cmdResult.Contains(#13#10) then
+      begin
+        Lines := cmdResult.Split([#13#10]);
+      end
+      else if cmdResult.Contains(#10) then
+      begin
+        Lines := cmdResult.Split([#10]);
+      end;
+
+      if Length(Lines) > 0 then
+      begin
+        fields := Lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
+        for i := 1 to Length(Lines) - 1 do
+        begin
+          fields := Lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
+          if fields[1].ToLower = 'ethernet' then
+          begin
+            netInterface := fields[0];
+            break;
+          end;
+        end;
+      end;
+
+      // get network config file name with extension ".yaml" : ls /etc/netplan
+      cmdResult := ExecuteCommand('ls /etc/netplan');
+      cmdResult := cmdResult.Trim;
+      names := cmdResult.Split([' '], TStringSplitOptions.ExcludeEmpty);
+      for name in names do
+      begin
+        try
+          ext := TPath.GetExtension(name).Trim;
+          if ext = '.yaml' then
+          begin
+            netConfigFileName := name;
+            break;
+          end;
+        finally
+
+        end;
+      end;
+
+      // run netplan config command to change with new ip address
+      { Here are some common subnet masks and their corresponding CIDR notations:
+        255.255.255.0 = /24
+        255.255.255.128 = /25
+        255.255.255.192 = /26
+        255.255.255.224 = /27
+        255.255.255.240 = /28
+        255.255.255.248 = /29
+        255.255.255.252 = /30
+        255.255.255.254 = /31
+        255.255.255.255 = /32
+
+        for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
+      }
+      if newMask = '255.255.255.0' then
+        newMask := '/24'
+      else if newMask = '255.255.255.128' then
+        newMask := '/25'
+      else if newMask = '255.255.255.192' then
+        newMask := '/26'
+      else if newMask = '255.255.255.224' then
+        newMask := '/27'
+      else if newMask = '255.255.255.240' then
+        newMask := '/28'
+      else if newMask = '255.255.255.248' then
+        newMask := '/29'
+      else if newMask = '255.255.255.252' then
+        newMask := '/30'
+      else if newMask = '255.255.255.254' then
+        newMask := '/31'
+      else if newMask = '255.255.255.255' then
+        newMask := '/32'
+      else
+        newMask := '/24';
+
+      netConfigContents := TStringList.Create;
+      netConfigContents.Add(Format('network:', []));
+      netConfigContents.Add(Format('  version: 2', []));
+      netConfigContents.Add(Format('  renderer: networkd', []));
+      netConfigContents.Add(Format('  ethernets:', []));
+      netConfigContents.Add(Format('    %s:', [netInterface]));
+      netConfigContents.Add(Format('      dhcp4: no', []));
+      netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
+      // netConfigContents.Add(Format('      addresses:', []));
+      // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
+      // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
+      netConfigContents.Add(Format('      nameservers:', []));
+      netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
+
+      cmd := Format('echo "%s" | sudo tee /etc/netplan/%s', [netConfigContents.Text, netConfigFileName]);
+      cmdResult := Self.ExecuteCommand(cmd);
+      Sleep(1000);
+
+      // restart ssh server: sudo systemctl restart sshd
+      cmdResult := ExecuteCommand('sudo systemctl restart sshd');
+
+      // apply ip change: sudo netplan apply
+      cmdResult := ExecuteCommand('sudo netplan apply');
+
+      // ShowMessage('New IP address applied');
+
+      // check if the new ip applied...
+      if TryPing(newIP) then
+      begin
+        // ShowMessage('Ping succeeded on New IP address');
+
+        res := True;
+
+        Self.FConnected := False;
+      end
+      else
+      begin
+        res := False;
+      end;
+
+    finally
+
+    end;
+
+  end;
+
   Result := res;
 end;
 
