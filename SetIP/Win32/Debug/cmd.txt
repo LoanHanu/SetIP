@@ -1,1 +1,1 @@
-ls
+sudo netplan apply

@@ -133,8 +133,6 @@ type
 
     procedure FormShow(Sender: TObject);
 
-    // procedure ScSSHClient1ServerKeyValidate(Sender: TObject; NewServerKey: TScKey; var Accept: Boolean);
-
     procedure ButtonTR40SshConnectClick(Sender: TObject);
     procedure EditTR40UserChange(Sender: TObject);
     procedure EditPasswordChange(Sender: TObject);
@@ -145,6 +143,7 @@ type
     procedure SshClientDosCommandNewLine(ASender: TObject; const ANewLine: string; AOutputType: TOutputType);
     procedure SshClientDosCommandTerminated(Sender: TObject);
     procedure ButtonTR40InputClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
     FDeviceManager: TDeviceManager;
     FSshClient: TPuttySshClient;
@@ -162,6 +161,12 @@ implementation
 
 uses
   uCommonUtils;
+
+procedure TMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  // save device configuration
+  Self.FDeviceManager.SaveToFile;
+end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
@@ -273,6 +278,9 @@ procedure TMainForm.FormShow(Sender: TObject);
 var
   octets: TArray<string>;
 begin
+  // load device info
+  Self.FDeviceManager.LoadFromFile;
+
 {$REGION TR40}
   octets := Self.FDeviceManager.TR40.IPAddress.Split(['.']);
   if Length(octets) = 4 then
@@ -591,12 +599,6 @@ begin
   editBox.Text := currVal.ToString;
   //
 end;
-
-// procedure TMainForm.ScSSHClient1ServerKeyValidate(Sender: TObject; NewServerKey: TScKey; var Accept: Boolean);
-// begin
-// //
-// Accept := True;
-// end;
 
 procedure TMainForm.OctetChange(Sender: TObject);
 var
