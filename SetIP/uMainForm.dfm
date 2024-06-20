@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'MainForm'
-  ClientHeight = 562
-  ClientWidth = 809
+  ClientHeight = 561
+  ClientWidth = 805
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -33,27 +33,24 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 809
-    Height = 562
+    Width = 805
+    Height = 561
     ActivePage = SheetTR40
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 805
-    ExplicitHeight = 561
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        801
-        532)
+        797
+        531)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 775
+        Width = 771
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
-        ExplicitWidth = 771
         object Label1: TLabel
           AlignWithMargins = True
           Left = 5
@@ -259,12 +256,11 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 775
+        Width = 771
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
-        ExplicitWidth = 771
         object Label2: TLabel
           AlignWithMargins = True
           Left = 5
@@ -817,12 +813,11 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 775
+        Width = 771
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
-        ExplicitWidth = 771
         object Label10: TLabel
           Left = 3
           Top = 16
@@ -997,17 +992,16 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        801
-        532)
+        797
+        531)
       object GroupBox3: TGroupBox
         Left = 3
         Top = 3
-        Width = 767
+        Width = 763
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
-        ExplicitWidth = 771
         object Label6: TLabel
           AlignWithMargins = True
           Left = 5
@@ -1209,12 +1203,11 @@ object MainForm: TMainForm
       object GroupBox4: TGroupBox
         Left = 3
         Top = 63
-        Width = 767
+        Width = 763
         Height = 218
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
-        ExplicitWidth = 771
         object Label7: TLabel
           AlignWithMargins = True
           Left = 5

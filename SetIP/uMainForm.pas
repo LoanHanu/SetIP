@@ -148,6 +148,8 @@ type
     FDeviceManager: TDeviceManager;
     FSshClient: TPuttySshClient;
 
+    procedure InitUI;
+
   public
     { Public declarations }
   end;
@@ -275,11 +277,17 @@ begin
 end;
 
 procedure TMainForm.FormShow(Sender: TObject);
-var
-  octets: TArray<string>;
 begin
   // load device info
   Self.FDeviceManager.LoadFromFile;
+
+  InitUI;
+end;
+
+procedure TMainForm.InitUI;
+var
+  octets: TArray<string>;
+begin
 
 {$REGION TR40}
   octets := Self.FDeviceManager.TR40.IPAddress.Split(['.']);
@@ -393,6 +401,8 @@ var
   OldCursor: TCursor;
   bmp: TBitmap;
 begin
+  Self.MemoTR40Output.Clear;
+
   Self.FSshClient.HostName := Self.EditTR40HostIP.Text;
   Self.FSshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
   Self.FSshClient.User := Self.EditTR40User.Text;
@@ -510,6 +520,16 @@ var
   netConfigContents: TStringList;
   bmp: TBitmap;
 begin
+  newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
+  if newIP = Self.FDeviceManager.TR40.IPAddress then
+  begin
+    ShowMessage('Please set new other IP address than the current.');
+    Exit;
+  end;
+
+  // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
+  newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
+
   OldCursor := Screen.Cursor;
   Screen.Cursor := crHourGlass;
 
@@ -517,16 +537,9 @@ begin
 
   if Self.FSshClient.Connected then
   begin
-    newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
-    // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
-    newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
+
     if Self.FSshClient.ChangeIP(newIP, newMask) then
     begin
-      // // set ping led on
-      // Self.ButtonTR40Ping.ImageIndex := 1;
-      // Self.IconList.GetBitmap(1, bmp);
-      // Self.ImageTR40PingLed.Picture.Assign(bmp);
-
       // set set ip led on
       Self.ButtonTR40SetIP.ImageIndex := 1;
       Self.IconList.GetBitmap(1, bmp);
@@ -534,15 +547,22 @@ begin
 
       Self.FDeviceManager.TR40.IPAddress := newIP;
       Self.FDeviceManager.TR40.SubnetMask := newMask;
+      Self.FDeviceManager.SaveToFile;
+
       Self.FSshClient.Connected := False; // set to False on new IP
-      //
+
+      // set ping led off
+      Self.ButtonTR40Ping.ImageIndex := 0;
+      Self.IconList.GetBitmap(0, bmp);
+      Self.ImageTR40PingLed.Picture.Assign(bmp);
+
       // Set connect led off
       Self.ButtonTR40SshConnect.ImageIndex := 0;
       Self.IconList.GetBitmap(0, bmp);
       Self.ImageTR40ConnectLed.Picture.Assign(bmp);
 
       // reload...
-      Self.FormShow(Self);
+      Self.InitUI;
     end;
 
   end

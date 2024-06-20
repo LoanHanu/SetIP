@@ -249,7 +249,6 @@ var
   Lines, fields, names: TArray<string>;
   line, name, ext: string;
   cmd: string;
-  // newGate: string;
   i: integer;
   netConfigContents: TStringList;
 begin
@@ -257,6 +256,7 @@ begin
   if Self.Connected then
   begin
     try
+
       // get network interface name of ethernet:
       // nmcli device status: get the device status of NetworkManager-controlled interfaces, including their names
       cmdResult := ExecuteCommand('nmcli device status');
@@ -284,98 +284,167 @@ begin
         end;
       end;
 
-      // get network config file name with extension ".yaml" : ls /etc/netplan
-      cmdResult := ExecuteCommand('ls /etc/netplan');
-      cmdResult := cmdResult.Trim;
-      names := cmdResult.Split([' '], TStringSplitOptions.ExcludeEmpty);
-      for name in names do
+      if netInterface = '' then // error
       begin
-        try
-          ext := TPath.GetExtension(name).Trim;
-          if ext = '.yaml' then
-          begin
-            netConfigFileName := name;
-            break;
-          end;
-        finally
-
-        end;
+        ShowMessage('There is no proper network interface.');
+        Result := False;
+        Exit;
       end;
 
-      // run netplan config command to change with new ip address
-      { Here are some common subnet masks and their corresponding CIDR notations:
-        255.255.255.0 = /24
-        255.255.255.128 = /25
-        255.255.255.192 = /26
-        255.255.255.224 = /27
-        255.255.255.240 = /28
-        255.255.255.248 = /29
-        255.255.255.252 = /30
-        255.255.255.254 = /31
-        255.255.255.255 = /32
-
-        for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
-      }
-      if newMask = '255.255.255.0' then
-        newMask := '/24'
-      else if newMask = '255.255.255.128' then
-        newMask := '/25'
-      else if newMask = '255.255.255.192' then
-        newMask := '/26'
-      else if newMask = '255.255.255.224' then
-        newMask := '/27'
-      else if newMask = '255.255.255.240' then
-        newMask := '/28'
-      else if newMask = '255.255.255.248' then
-        newMask := '/29'
-      else if newMask = '255.255.255.252' then
-        newMask := '/30'
-      else if newMask = '255.255.255.254' then
-        newMask := '/31'
-      else if newMask = '255.255.255.255' then
-        newMask := '/32'
-      else
-        newMask := '/24';
+      // network config file:
+      // the case of modern OS(Ubuntu 17.10 or later) : /etc/netplan/*.yaml
+      // the case of old OS(traditional network): /etc/network/interfaces
 
       netConfigContents := TStringList.Create;
-      netConfigContents.Add(Format('network:', []));
-      netConfigContents.Add(Format('  version: 2', []));
-      netConfigContents.Add(Format('  renderer: networkd', []));
-      netConfigContents.Add(Format('  ethernets:', []));
-      netConfigContents.Add(Format('    %s:', [netInterface]));
-      netConfigContents.Add(Format('      dhcp4: no', []));
-      netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
-      // netConfigContents.Add(Format('      addresses:', []));
-      // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
-      // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
-      netConfigContents.Add(Format('      nameservers:', []));
-      netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
 
-      cmd := Format('echo "%s" | sudo tee /etc/netplan/%s', [netConfigContents.Text, netConfigFileName]);
-      cmdResult := Self.ExecuteCommand(cmd);
-      Sleep(1000);
-
-      // restart ssh server: sudo systemctl restart sshd
-      cmdResult := ExecuteCommand('sudo systemctl restart sshd');
-
-      // apply ip change: sudo netplan apply
-      cmdResult := ExecuteCommand('sudo netplan apply');
-
-      // ShowMessage('New IP address applied');
-
-      // check if the new ip applied...
-      if TryPing(newIP) then
+      // get network config file name with extension ".yaml" : ls /etc/netplan
+      netConfigFileName := '';
+      cmdResult := ExecuteCommand('ls /etc/netplan'); // 'ls: cannot access ''/etc/netplan'': No such file or directory'
+      cmdResult := cmdResult.Trim;
+      if cmdResult.ToLower.Contains('no such file or directory') or (cmdResult = '') then
       begin
-        // ShowMessage('Ping succeeded on New IP address');
-
-        res := True;
-
-        Self.FConnected := False;
+        netConfigFileName := '';
       end
       else
       begin
-        res := False;
+        names := cmdResult.Split([' '], TStringSplitOptions.ExcludeEmpty);
+        for name in names do
+        begin
+          try
+            ext := TPath.GetExtension(name).Trim;
+            if ext = '.yaml' then
+            begin
+              netConfigFileName := name;
+
+              break;
+            end;
+          finally
+
+          end;
+        end;
       end;
+
+      if netConfigFileName <> '' then // the case of morden OS
+      begin
+        netConfigFileName := '/etc/netplan/' + netConfigFileName; // MAKE FULL PATH
+
+        { Here are some common subnet masks and their corresponding CIDR notations:
+          255.255.255.0 = /24
+          255.255.255.128 = /25
+          255.255.255.192 = /26
+          255.255.255.224 = /27
+          255.255.255.240 = /28
+          255.255.255.248 = /29
+          255.255.255.252 = /30
+          255.255.255.254 = /31
+          255.255.255.255 = /32
+
+          for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
+        }
+        if newMask = '255.255.255.0' then
+          newMask := '/24'
+        else if newMask = '255.255.255.128' then
+          newMask := '/25'
+        else if newMask = '255.255.255.192' then
+          newMask := '/26'
+        else if newMask = '255.255.255.224' then
+          newMask := '/27'
+        else if newMask = '255.255.255.240' then
+          newMask := '/28'
+        else if newMask = '255.255.255.248' then
+          newMask := '/29'
+        else if newMask = '255.255.255.252' then
+          newMask := '/30'
+        else if newMask = '255.255.255.254' then
+          newMask := '/31'
+        else if newMask = '255.255.255.255' then
+          newMask := '/32'
+        else
+          newMask := '/24';
+
+        netConfigContents.Clear;
+        netConfigContents.Add(Format('network:', []));
+        netConfigContents.Add(Format('  version: 2', []));
+        netConfigContents.Add(Format('  renderer: networkd', []));
+        netConfigContents.Add(Format('  ethernets:', []));
+        netConfigContents.Add(Format('    %s:', [netInterface]));
+        netConfigContents.Add(Format('      dhcp4: no', []));
+        netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
+        // netConfigContents.Add(Format('      addresses:', []));
+        // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
+        // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
+        netConfigContents.Add(Format('      nameservers:', []));
+        netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
+
+      end
+      else // the case of old OS
+      begin
+        netConfigFileName := '/etc/network/interfaces';
+
+        {
+          auto eth0
+          iface eth0 inet static
+          address 192.168.1.10
+          netmask 255.255.255.0
+          gateway 192.168.1.1
+        }
+        netConfigContents.Clear;
+        netConfigContents.Add(Format('auto %s', [netInterface]));
+        netConfigContents.Add(Format('iface %s inet static', [netInterface]));
+        netConfigContents.Add(Format('address %s', [newIP]));
+        netConfigContents.Add(Format('netmask %s', [newMask]));
+        // netConfigContents.Add(Format('gateway %s', [newGate]));
+
+      end;
+
+      // run netplan config command to change with new ip address
+      cmd := Format('echo "%s" | sudo tee %s', [netConfigContents.Text, netConfigFileName]);
+      cmdResult := Self.ExecuteCommand(cmd);
+      Sleep(1000);
+
+      if netConfigFileName.Contains('.yaml') then
+      begin
+        // restart ssh server: sudo systemctl restart sshd
+        cmdResult := ExecuteCommand('sudo systemctl restart sshd');
+
+        // apply ip change: sudo netplan apply
+        cmdResult := ExecuteCommand('sudo netplan apply');
+
+        // check if the new ip applied...
+        if TryPing(newIP) then
+        begin
+          // ShowMessage('Ping succeeded on New IP address');
+
+          res := True;
+          Self.FConnected := False;
+        end;
+
+      end
+      else if netConfigFileName = '/etc/network/interfaces' then
+      begin
+        cmdResult := ExecuteCommand('sudo systemctl restart networking.service');
+        cmdResult := ExecuteCommand(Format('sudo ifdown %s && sudo ifup %s', [netInterface, netInterface]));
+        cmdResult := ExecuteCommand(Format('sudo ifdown %s && sudo ifup %s', [netInterface, netInterface])); // need twice, but not sure why
+        cmdResult := ExecuteCommand('sudo hostname -I');
+
+        // check if new ip applied
+        if cmdResult.Contains(newIP) then
+        begin
+          res := True;
+          Self.FConnected := False;
+
+          // finally send cmd for reboot
+          cmdResult := ExecuteCommand('sudo reboot');
+        end
+        else
+        begin
+          res := False;
+          Self.FConnected := False;
+        end;
+
+      end;
+
+      // ShowMessage('New IP address applied');
 
     finally
 
