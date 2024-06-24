@@ -7,7 +7,12 @@ uses
   uPuttySshClient in 'Service\uPuttySshClient.pas',
   uOpenSshClient in 'Service\uOpenSshClient.pas',
   uCommonUtils in 'uCommonUtils.pas',
-  DosCommand in 'Service\DosCommand.pas';
+  uDosCommand in 'Service\uDosCommand.pas',
+  uSshClient in 'Service\uSshClient.pas',
+  libssh2 in 'Service\libssh2\libssh2.pas',
+  LibSsh2Client in 'Service\libssh2\LibSsh2Client.pas',
+  SocketUtils in 'Service\libssh2\SocketUtils.pas',
+  uLibSsh2Client in 'Service\uLibSsh2Client.pas';
 
 {$R *.res}
 

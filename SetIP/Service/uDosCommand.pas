@@ -132,7 +132,7 @@
   DiskName := 'test';
   DosCommand1.SendLine(DiskName, True); //enter the name of the volume
   ******************************************************************* }
-unit DosCommand;
+unit uDosCommand;
 
 interface
 

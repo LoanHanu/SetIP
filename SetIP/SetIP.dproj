@@ -106,7 +106,12 @@
         <DCCReference Include="Service\uPuttySshClient.pas"/>
         <DCCReference Include="Service\uOpenSshClient.pas"/>
         <DCCReference Include="uCommonUtils.pas"/>
-        <DCCReference Include="Service\DosCommand.pas"/>
+        <DCCReference Include="Service\uDosCommand.pas"/>
+        <DCCReference Include="Service\uSshClient.pas"/>
+        <DCCReference Include="Service\libssh2\libssh2.pas"/>
+        <DCCReference Include="Service\libssh2\LibSsh2Client.pas"/>
+        <DCCReference Include="Service\libssh2\SocketUtils.pas"/>
+        <DCCReference Include="Service\uLibSsh2Client.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -3,44 +3,26 @@ unit uPuttySshClient;
 interface
 
 uses
-  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs, System.IOUtils, DosCommand;
+  Classes, SysUtils, WinAPI.ShellAPI, SyncObjs, Vcl.Dialogs, System.IOUtils, uDosCommand,
+  uSshClient;
 
 type
-  TSshConnectionOption = (coPassword, coPubicKey);
-
-  TSshCmdType = (ctNull, ctCheckPuttyVersion, ctCheckHomeList);
 
   /// <summary>
   /// ssh client using PuTTy: plink.exe
   /// </summary>
-  TPuttySshClient = class
-  private
-    FPlinkPath: string;
-    FHostName: string;
-    FPort: integer;
-    FUser: string;
-    FPassword: string;
-    FPrivateKey: string; // path to private key file
-    FConnected: Boolean;
-    FConnectionOption: TSshConnectionOption;
-    FLockObject: TCriticalSection;
-
-    FDosCommand: TDosCommand;
-    FDosCommandIsRunning: Boolean;
-    FDosCommandOnNewLine: TNewLineEvent;
-    FDosCommandOnStarted: TNotifyEvent; // added by Loan
-    FDosCommandOnTerminated: TNotifyEvent;
-
+  TPuttySshClient = class(TSshClient)
   private
     function IsPuttyInstalled: Boolean;
 
   public
-    constructor Create;
+    constructor Create; override;
     destructor Destroy; override;
 
-    function CanConnect: Boolean;
+    procedure Connect; override;
+    procedure DisConnect; override;
 
-    function ChangeIP(newIP, newMask: string; newGate: string = ''): Boolean;
+    function ChangeIP(newIP, newMask, newGate: string): Boolean; override;
 
     /// <summary>
     /// execute cmd on remote machine, ssh server
@@ -52,6 +34,7 @@ type
     function GetDosCommandLine: string;
     function GetDosCommandOutputLines: TStrings;
     function GetDosCommandIsRunning: Boolean;
+
     procedure SetDosCommandOnNewLine(Value: TNewLineEvent);
     procedure SetDosCommandOnStarted(Value: TNotifyEvent);
     procedure SetDosCommandOnTerminated(Value: TNotifyEvent);
@@ -65,21 +48,13 @@ type
     procedure DosCommandTerminated(Sender: TObject);
 
   public
-    property PlinkPath: string read FPlinkPath write FPlinkPath;
-    property HostName: string read FHostName write FHostName;
-    property Port: integer read FPort write FPort;
-    property User: string read FUser write FUser;
-    property Password: string read FPassword write FPassword;
-    property PrivateKey: string read FPrivateKey write FPrivateKey;
-    property Connected: Boolean read FConnected write FConnected;
-    property ConnectionOption: TSshConnectionOption read FConnectionOption write FConnectionOption;
 
     property DosCommandLine: string read GetDosCommandLine write SetDosCommandLine;
     property DosCommandOutputLines: TStrings read GetDosCommandOutputLines;
     property DosCommandIsRunning: Boolean read GetDosCommandIsRunning;
-    property DosCommandOnNewLine: TNewLineEvent read FDosCommandOnNewLine write SetDosCommandOnNewLine;
-    property DosCommandOnStarted: TNotifyEvent read FDosCommandOnStarted write SetDosCommandOnStarted; // added by Loan
-    property DosCommandOnTerminated: TNotifyEvent read FDosCommandOnTerminated write SetDosCommandOnTerminated;
+    property DosCommandOnNewLine: TNewLineEvent write SetDosCommandOnNewLine;
+    property DosCommandOnStarted: TNotifyEvent write SetDosCommandOnStarted; // added by Loan
+    property DosCommandOnTerminated: TNotifyEvent write SetDosCommandOnTerminated;
 
   end;
 
@@ -90,25 +65,14 @@ uses
 
 constructor TPuttySshClient.Create;
 begin
-  FPlinkPath := 'plink.exe'; // C:\Program Files\PuTTY\plink.exe when installed x64 version
-  FHostName := 'localhost'; // or host ip address
-  FPort := 22;
-  FConnected := False;
-  FConnectionOption := coPassword;
-  FLockObject := TCriticalSection.Create;
+  FProcessPath := 'plink.exe'; // C:\Program Files\PuTTY\plink.exe when installed x64 version
 
-  FDosCommand := TDosCommand.Create(nil);
-  // FDosCommand.MaxTimeAfterBeginning := 5;
-  // FDosCommand.MaxTimeAfterLastOutput := 5;
-  FDosCommand.InputToOutput := False;
+  inherited;
 end;
 
 destructor TPuttySshClient.Destroy;
 begin
   inherited;
-
-  FLockObject.Free;
-  FDosCommand.Free;
 end;
 
 function TPuttySshClient.IsPuttyInstalled: Boolean;
@@ -121,7 +85,7 @@ begin
 
   output := TStringList.Create;
 
-  cmdLine := Format('%s -V', [FPlinkPath]);
+  cmdLine := Format('%s -V', [FProcessPath]);
   try
     // if not FDosCommand.IsRunning then
     // begin
@@ -173,13 +137,20 @@ begin
 
 end;
 
-function TPuttySshClient.CanConnect: Boolean;
-var
-  res: Boolean;
-  cmdResult: string;
+procedure TPuttySshClient.DisConnect;
 begin
-  res := False;
+  if Self.FIsConnected and Self.FDosCommand.IsRunning then
+  begin
+    FDosCommand.SendLine('exit', True);
+  end;
 
+end;
+
+procedure TPuttySshClient.Connect;
+var
+  cmdResult: string;
+  CommandLine: string;
+begin
   // if not Self.IsPuttyInstalled then
   // begin
   // Result := False;
@@ -196,52 +167,63 @@ begin
     // 'plink' is not recognized as an internal or external command - PuTTy not installed
     coPassword:
       begin
-        cmdResult := ExecuteCommand('ls');
-        if cmdResult.ToLower.Contains('error') then // or
+        if FDosCommand.IsRunning then
         begin
-          if cmdResult.Contains('Network error: Connection timed out') then
-          begin
-            ShowMessage(cmdResult + #13#10 + 'Please check if host name or port number is correct.');
-          end
-          else if cmdResult.Contains('Network error: Connection refused') then
-          begin
-            ShowMessage(cmdResult + #13#10 + 'Please check if host name or port number is correct.');
-          end
-          else if cmdResult.Contains('Configured password was not accepted') then
-          begin
-            ShowMessage(cmdResult + #13#10 + 'Please check if user name or password is correct.');
-          end
-          else if cmdResult.Contains('Cannot confirm a host key in batch mode') then
-          begin
-            cmdResult := ExecuteCommand('ls', False);
-            // ShowMessage(cmdResult);
-          end
-          else
-          begin
-            ShowMessage(cmdResult);
-          end;
-
-          res := False;
-        end
-        else if cmdResult.Contains('is not recognized as an internal or external command') then
-        begin
-          ShowMessage(cmdResult + #13#10 + 'Please check if PuTTy installed properly.');
-        end
-        else
-        begin
-          res := True;
+          Sleep(1000); // wait for some seconds
+          FDosCommand.Stop;
         end;
+
+        if not FDosCommand.IsRunning then
+        begin
+          CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s', [FProcessPath, FHostName, FPort, FUser, FPassword]);
+          Self.FDosCommand.CommandLine := CommandLine;
+          Self.FDosCommand.Execute;
+          Self.FIsConnecting := True;
+        end;
+
+        // cmdResult := ExecuteCommand('ls');
+        // if cmdResult.ToLower.Contains('error') then // or
+        // begin
+        // if cmdResult.Contains('Network error: Connection timed out') then
+        // begin
+        // ShowMessage(cmdResult + #13#10 + 'Please check if host name or port number is correct.');
+        // end
+        // else if cmdResult.Contains('Network error: Connection refused') then
+        // begin
+        // ShowMessage(cmdResult + #13#10 + 'Please check if host name or port number is correct.');
+        // end
+        // else if cmdResult.Contains('Configured password was not accepted') then
+        // begin
+        // ShowMessage(cmdResult + #13#10 + 'Please check if user name or password is correct.');
+        // end
+        // else if cmdResult.Contains('Cannot confirm a host key in batch mode') then
+        // begin
+        // cmdResult := ExecuteCommand('ls', False);
+        // // ShowMessage(cmdResult);
+        // end
+        // else
+        // begin
+        // ShowMessage(cmdResult);
+        // end;
+        //
+        //
+        // end
+        // else if cmdResult.Contains('is not recognized as an internal or external command') then
+        // begin
+        // ShowMessage(cmdResult + #13#10 + 'Please check if PuTTy installed properly.');
+        // end
+        // else
+        // begin
+        //
+        // end;
       end;
-    coPubicKey:
+    coIdKey:
       begin
       end;
   end;
-
-  FConnected := res;
-  Result := res;
 end;
 
-function TPuttySshClient.ChangeIP(newIP, newMask: string; newGate: string = ''): Boolean;
+function TPuttySshClient.ChangeIP(newIP, newMask, newGate: string): Boolean;
 var
   res: Boolean;
   cmdResult: string;
@@ -253,7 +235,7 @@ var
   netConfigContents: TStringList;
 begin
   res := False;
-  if Self.Connected then
+  if Self.FIsConnected then
   begin
     try
 
@@ -416,7 +398,7 @@ begin
           // ShowMessage('Ping succeeded on New IP address');
 
           res := True;
-          Self.FConnected := False;
+          Self.FIsConnected := False;
         end;
 
       end
@@ -431,7 +413,7 @@ begin
         if cmdResult.Contains(newIP) then
         begin
           res := True;
-          Self.FConnected := False;
+          Self.FIsConnected := False;
 
           // finally send cmd for reboot
           cmdResult := ExecuteCommand('sudo reboot');
@@ -439,7 +421,7 @@ begin
         else
         begin
           res := False;
-          Self.FConnected := False;
+          Self.FIsConnected := False;
         end;
 
       end;
@@ -459,41 +441,48 @@ function TPuttySshClient.ExecuteCommand(cmd: string; inBatch: Boolean = True): s
 var
   res: string;
   CommandLine: string;
-  output, input: TStringList;
+  output: TStringList;
 begin
   res := '';
 
   output := TStringList.Create;
-  input := TStringList.Create;
 
-  output.Text := cmd;
-  output.SaveToFile('cmd.txt');
-
-  if inBatch then
+  if cmd = '' then // the case of connection cmd
   begin
-    // commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch %s', [FPlinkPath, FHostName, FPort, FUser, FPassword, cmd]);
-    CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch -m cmd.txt', [FPlinkPath, FHostName, FPort, FUser, FPassword]);
-    try
-      output.Clear;
-      ExecuteCommandLine(CommandLine, output);
-      res := output.Text;
-    finally
-      output.Free;
-    end;
-  end
-  else
-  begin
-    input.Add('y'); // for yes
-    CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s -m cmd.txt', [FPlinkPath, FHostName, FPort, FUser, FPassword]);
-    try
-      output.Clear;
-      // ExecuteCommandLine2(commandLine, output, input);
-      Self.FDosCommand.CommandLine := CommandLine;
-      Self.FDosCommand.Execute;
+    CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s', [FProcessPath, FHostName, FPort, FUser, FPassword]);
 
-      res := output.Text;
-    finally
-      output.Free;
+  end;
+
+  if cmd <> '' then
+  begin
+    output.Text := cmd;
+    output.SaveToFile('cmd.txt');
+
+    if inBatch then
+    begin
+      // commandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch %s', [FPlinkPath, FHostName, FPort, FUser, FPassword, cmd]);
+      CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s -batch -m cmd.txt', [FProcessPath, FHostName, FPort, FUser, FPassword]);
+      try
+        output.Clear;
+        ExecuteCommandLine(CommandLine, output);
+        res := output.Text;
+      finally
+        output.Free;
+      end;
+    end
+    else
+    begin
+      CommandLine := Format('%s -ssh %s -P %d -l %s -pw %s -m cmd.txt', [FProcessPath, FHostName, FPort, FUser, FPassword]);
+      try
+        output.Clear;
+
+        Self.FDosCommand.CommandLine := CommandLine;
+        Self.FDosCommand.Execute;
+
+        res := output.Text;
+      finally
+        output.Free;
+      end;
     end;
   end;
 
@@ -542,7 +531,8 @@ end;
 //
 procedure TPuttySshClient.SendLineToDosCommand(input: string; eol: Boolean);
 begin
-  Self.FDosCommand.SendLine(input, eol);
+  if Self.FDosCommand.IsRunning then
+    Self.FDosCommand.SendLine(input, eol);
 end;
 
 procedure TPuttySshClient.DosCommandStarted(Sender: TObject);

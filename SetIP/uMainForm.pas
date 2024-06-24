@@ -5,8 +5,8 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, System.ImageList, Vcl.ImgList, Vcl.ExtCtrls,
-  IdIcmpClient, IdComponent, Vcl.Mask, System.IOUtils, System.Generics.Collections,
-  uDevice, uPuttySshClient, DosCommand, IdBaseComponent, IdRawBase, IdRawClient;
+  IdIcmpClient, IdComponent, Vcl.Mask, System.IOUtils, System.Generics.Collections, IdBaseComponent, IdRawBase, IdRawClient,
+  uDevice, uSshClient, uPuttySshClient, uOpenSshClient, uLibSsh2Client, uDosCommand;
 
 type
   TMainForm = class(TForm)
@@ -54,7 +54,7 @@ type
     EditTR40NewGateOctet2: TEdit;
     Edit20: TEdit;
     EditTR40NewGateOctet1: TEdit;
-    ButtonTR40SetIP: TButton;
+    ButtonTR40ChangeIP: TButton;
     GroupBox3: TGroupBox;
     Label6: TLabel;
     ButtonIO40Ping: TButton;
@@ -94,7 +94,7 @@ type
     EditIO40NewGateOctet2: TEdit;
     Edit36: TEdit;
     EditIO40NewGateOctet1: TEdit;
-    ButtonIO40SetIP: TButton;
+    ButtonIO40ChangeIP: TButton;
     GroupBox5: TGroupBox;
     Label10: TLabel;
     RadioButton1: TRadioButton;
@@ -119,6 +119,31 @@ type
     ImageTR40PingLed: TImage;
     ImageTR40ConnectLed: TImage;
     ImageTR40SetIPLed: TImage;
+    GroupBox6: TGroupBox;
+    Label16: TLabel;
+    Label18: TLabel;
+    Label19: TLabel;
+    Label20: TLabel;
+    Label21: TLabel;
+    Label22: TLabel;
+    Label23: TLabel;
+    Label24: TLabel;
+    ImageIO40ConnectLed: TImage;
+    RadioButton4: TRadioButton;
+    RadioButton5: TRadioButton;
+    RadioButton6: TRadioButton;
+    EditIO40HostIP: TEdit;
+    EditIO40SshPort: TEdit;
+    EditIO40User: TEdit;
+    ButtonIO40Connect: TButton;
+    EditIO40Pass: TButtonedEdit;
+    MemoIO40Output: TMemo;
+    EditIO40Input: TEdit;
+    ButtonIO40Input: TButton;
+    ImageIO40PingLed: TImage;
+    ImageIO40SetLed: TImage;
+    ButtonIO40Disconnect: TButton;
+    ButtonTR40Disconnect: TButton;
 
     procedure OctetEditExit(Sender: TObject);
     procedure OctetChange(Sender: TObject);
@@ -126,10 +151,10 @@ type
     procedure FormCreate(Sender: TObject);
 
     procedure ButtonTR40PingClick(Sender: TObject);
-    procedure ButtonTR40SetIPClick(Sender: TObject);
+    procedure ButtonTR40ChangeIPClick(Sender: TObject);
 
     procedure ButtonIO40PingClick(Sender: TObject);
-    procedure ButtonIO40SetIPClick(Sender: TObject);
+    procedure ButtonIO40ChangeIPClick(Sender: TObject);
 
     procedure FormShow(Sender: TObject);
 
@@ -137,16 +162,21 @@ type
     procedure EditTR40UserChange(Sender: TObject);
     procedure EditPasswordChange(Sender: TObject);
     procedure EditTR40PassRightButtonClick(Sender: TObject);
+
     procedure FormDestroy(Sender: TObject);
 
     procedure SshClientDosCommandStarted(Sender: TObject);
     procedure SshClientDosCommandNewLine(ASender: TObject; const ANewLine: string; AOutputType: TOutputType);
     procedure SshClientDosCommandTerminated(Sender: TObject);
+
     procedure ButtonTR40InputClick(Sender: TObject);
+
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+    procedure ButtonTR40DisconnectClick(Sender: TObject);
   private
     FDeviceManager: TDeviceManager;
-    FSshClient: TPuttySshClient;
+    FSshClient: TSshClient;
 
     procedure InitUI;
 
@@ -261,10 +291,18 @@ begin
 
   Self.FDeviceManager := TDeviceManager.Create;
   // Self.FDeviceManager.LoadFromFile;
-  Self.FSshClient := TPuttySshClient.Create;
-  Self.FSshClient.DosCommandOnStarted := SshClientDosCommandStarted;
-  Self.FSshClient.DosCommandOnNewLine := SshClientDosCommandNewLine;
-  Self.FSshClient.DosCommandOnTerminated := SshClientDosCommandTerminated;
+
+  // Self.FSshClient := TPuttySshClient.Create;
+  // Self.FSshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  // Self.FSshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  // Self.FSshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
+
+  // Self.FSshClient := TOpenSshClient.Create;
+  // Self.FSshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  // Self.FSshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  // Self.FSshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
+
+  Self.FSshClient := TLibSsh2Client.Create;
 
 end;
 
@@ -352,8 +390,8 @@ begin
     Self.ButtonTR40Input.Enabled := True;
     Self.EditTR40Input.Enabled := True;
 
-    Self.LabelTR40ConnectionState.Visible := True;
-    Self.LabelTR40ConnectionState.Caption := 'Connecting...';
+    // Self.LabelTR40ConnectionState.Visible := True;
+    // Self.LabelTR40ConnectionState.Caption := 'Connecting...';
 
     Self.MemoTR40Output.Lines.Clear;
 
@@ -364,10 +402,56 @@ begin
 end;
 
 procedure TMainForm.SshClientDosCommandNewLine(ASender: TObject; const ANewLine: string; AOutputType: TOutputType);
+var
+  bmp: TBitmap;
 begin
+  bmp := TBitmap.Create;
   if Self.PageControl.ActivePage = Self.SheetTR40 then
   begin
     Self.MemoTR40Output.Lines.Add(ANewLine);
+
+    if FSshClient.IsConnecting and ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
+    begin
+      FSshClient.DosCommand.SendLine('y', True);
+      FSshClient.IsConnecting := False;
+    end;
+
+    if FSshClient.IsConnecting and ANewLine.Contains('password:') then
+
+      if ANewLine.Contains('Last login:') then
+      begin
+        Self.FSshClient.IsConnected := True;
+
+        if Self.PageControl.ActivePage = Self.SheetTR40 then
+        begin
+          FDeviceManager.TR40.IPAddress := Self.EditTR40HostIP.Text;
+          FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+          FDeviceManager.TR40.User := Self.EditTR40User.Text;
+          FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
+        end
+        else if Self.PageControl.ActivePage = Self.SheetIO40 then
+        begin
+
+        end;
+
+        Self.FDeviceManager.SaveToFile;
+
+        Self.ButtonTR40SshConnect.ImageIndex := 1;
+        Self.IconList.GetBitmap(1, bmp);
+        Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+
+      end;
+
+    if Self.FSshClient.IsConnected and ANewLine.Contains('logout') then
+    begin
+      Self.FSshClient.IsConnected := False;
+
+      Self.ButtonTR40SshConnect.ImageIndex := 0;
+      Self.IconList.GetBitmap(0, bmp);
+      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    end;
+
+
     // if ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
     // begin
     // Self.EditTR40Input.Text := 'y';
@@ -378,6 +462,8 @@ begin
   else if Self.PageControl.ActivePage = Self.SheetIO40 then
   begin
   end;
+
+  bmp.Free;
 
 end;
 
@@ -412,18 +498,62 @@ begin
   OldCursor := Screen.Cursor;
   try
     Screen.Cursor := crHourGlass;
-    if FSshClient.CanConnect then
-    begin
-      Self.ButtonTR40SshConnect.ImageIndex := 1;
-      Self.IconList.GetBitmap(1, bmp);
-      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
-    end
-    else
-    begin
-      Self.ButtonTR40SshConnect.ImageIndex := 0;
-      Self.IconList.GetBitmap(0, bmp);
-      Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    try
+      if FSshClient.IsConnected then
+      begin
+        Exit;
+      end
+      else
+      begin
+        Self.ButtonTR40SshConnect.ImageIndex := 0;
+        Self.IconList.GetBitmap(0, bmp);
+        Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+
+        FSshClient.Connect;
+
+        if FSshClient.IsConnected then
+        begin
+          if Self.PageControl.ActivePage = Self.SheetTR40 then
+          begin
+            FDeviceManager.TR40.IPAddress := Self.EditTR40HostIP.Text;
+            FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+            FDeviceManager.TR40.User := Self.EditTR40User.Text;
+            FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
+          end
+          else if Self.PageControl.ActivePage = Self.SheetIO40 then
+          begin
+
+          end;
+
+          Self.FDeviceManager.SaveToFile;
+
+          Self.ButtonTR40SshConnect.ImageIndex := 1;
+          Self.IconList.GetBitmap(1, bmp);
+          Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+        end
+        else
+        begin
+          Self.ButtonTR40SshConnect.ImageIndex := 0;
+          Self.IconList.GetBitmap(0, bmp);
+          Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+        end;
+      end;
+
+    finally
+
     end;
+    // if FSshClient.Connect then
+    // begin
+    // Self.ButtonTR40SshConnect.ImageIndex := 1;
+    // Self.IconList.GetBitmap(1, bmp);
+    // Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    // end
+    // else
+    // begin
+    // Self.ButtonTR40SshConnect.ImageIndex := 0;
+    // Self.IconList.GetBitmap(0, bmp);
+    // Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    // end;
   finally
     Screen.Cursor := OldCursor;
     bmp.Free;
@@ -464,16 +594,16 @@ begin
   end;
 end;
 
-procedure TMainForm.ButtonIO40SetIPClick(Sender: TObject);
+procedure TMainForm.ButtonIO40ChangeIPClick(Sender: TObject);
 begin
   //
 end;
 
 procedure TMainForm.ButtonTR40InputClick(Sender: TObject);
 begin
-  if FSshClient.DosCommandIsRunning then
+  if FSshClient.DosCommand.IsRunning then
   begin
-    FSshClient.SendLineToDosCommand(Self.EditTR40Input.Text, True);
+    FSshClient.DosCommand.SendLine(Self.EditTR40Input.Text, True);
   end;
 end;
 
@@ -489,7 +619,7 @@ begin
 
   bmp := TBitmap.Create;
   CurrIP := Format('%s.%s.%s.%s', [EditTR40CurrIPOctet1.Text, EditTR40CurrIPOctet2.Text, EditTR40CurrIPOctet3.Text, EditTR40CurrIPOctet4.Text]);
-  if TryPing(CurrIP) then
+  if Self.FSshClient.TryPing(CurrIP) then
   begin
     Self.ButtonTR40Ping.ImageIndex := 1;
     Self.IconList.GetBitmap(1, bmp);
@@ -508,13 +638,13 @@ begin
   Screen.Cursor := OldCursor;
 end;
 
-procedure TMainForm.ButtonTR40SetIPClick(Sender: TObject);
+procedure TMainForm.ButtonTR40ChangeIPClick(Sender: TObject);
 var
   OldCursor: TCursor;
   result: string;
   Lines, fields, names: TArray<string>;
   line, name, ext: string;
-  newIP, newMask, cmd: string;
+  newIP, newMask, newGate, cmd: string;
   // newGate: string;
   i: integer;
   netConfigContents: TStringList;
@@ -529,19 +659,20 @@ begin
 
   // newGate := Format('%s.%s.%s.%s', [EditTR40NewGateOctet1.Text, EditTR40NewGateOctet2.Text, EditTR40NewGateOctet3.Text, EditTR40NewGateOctet4.Text]);
   newMask := Format('%s.%s.%s.%s', [EditTR40NewMaskOctet1.Text, EditTR40NewMaskOctet2.Text, EditTR40NewMaskOctet3.Text, EditTR40NewMaskOctet4.Text]);
+  newGate := '';
 
   OldCursor := Screen.Cursor;
   Screen.Cursor := crHourGlass;
 
   bmp := TBitmap.Create;
 
-  if Self.FSshClient.Connected then
+  if Self.FSshClient.IsConnected then
   begin
 
-    if Self.FSshClient.ChangeIP(newIP, newMask) then
+    if Self.FSshClient.ChangeIP(newIP, newMask, newGate) then
     begin
       // set set ip led on
-      Self.ButtonTR40SetIP.ImageIndex := 1;
+      Self.ButtonTR40ChangeIP.ImageIndex := 1;
       Self.IconList.GetBitmap(1, bmp);
       Self.ImageTR40SetIPLed.Picture.Assign(bmp);
 
@@ -549,7 +680,7 @@ begin
       Self.FDeviceManager.TR40.SubnetMask := newMask;
       Self.FDeviceManager.SaveToFile;
 
-      Self.FSshClient.Connected := False; // set to False on new IP
+      Self.FSshClient.IsConnected := False; // set to False on new IP
 
       // set ping led off
       Self.ButtonTR40Ping.ImageIndex := 0;
@@ -568,7 +699,7 @@ begin
   end
   else
   begin
-    Self.ButtonTR40SetIP.ImageIndex := 0;
+    Self.ButtonTR40ChangeIP.ImageIndex := 0;
     Self.IconList.GetBitmap(0, bmp);
     Self.ImageTR40SetIPLed.Picture.Assign(bmp);
 
@@ -586,6 +717,16 @@ begin
 
   bmp.Free;
   Screen.Cursor := OldCursor;
+end;
+
+procedure TMainForm.ButtonTR40DisconnectClick(Sender: TObject);
+begin
+  //
+  if Self.FSshClient.IsConnected then
+  begin
+    Self.FSshClient.DisConnect;
+  end;
+
 end;
 
 procedure TMainForm.EditPasswordChange(Sender: TObject);
