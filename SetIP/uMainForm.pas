@@ -430,9 +430,6 @@ end;
 
 procedure TMainForm.FormShow(Sender: TObject);
 begin
-  // load device info
-  Self.FDeviceManager.LoadFromFile;
-
   InitUI;
 end;
 
@@ -448,6 +445,9 @@ procedure TMainForm.InitUI;
 var
   octets: TArray<string>;
 begin
+  // load device info
+  Self.FDeviceManager.LoadFromFile;
+
 {$REGION TR40}
   if Self.PageControl.ActivePage = SheetTR40 then
   begin

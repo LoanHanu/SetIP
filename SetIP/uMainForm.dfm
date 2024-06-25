@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'MainForm'
   ClientHeight = 561
-  ClientWidth = 825
+  ClientWidth = 821
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -33,21 +33,21 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 825
+    Width = 821
     Height = 561
-    ActivePage = SheetIO40
+    ActivePage = SheetTR40
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        817
+        813
         531)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 779
+        Width = 775
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -257,7 +257,7 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 779
+        Width = 775
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -814,7 +814,7 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 779
+        Width = 775
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
@@ -1003,12 +1003,12 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        817
+        813
         531)
       object GroupBox3: TGroupBox
         Left = 3
         Top = 114
-        Width = 802
+        Width = 798
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -1218,7 +1218,7 @@ object MainForm: TMainForm
       object GroupBox4: TGroupBox
         Left = 3
         Top = 390
-        Width = 802
+        Width = 798
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -1299,7 +1299,6 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '2'
-            ExplicitTop = 9
           end
           object Edit15: TEdit
             AlignWithMargins = True
@@ -1775,7 +1774,7 @@ object MainForm: TMainForm
       object GroupBox6: TGroupBox
         Left = 3
         Top = 174
-        Width = 802
+        Width = 798
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'

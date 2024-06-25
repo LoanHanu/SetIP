@@ -84,7 +84,7 @@ var
 begin
   res := False;
   Ping := TIdIcmpClient.Create(nil);
-  Ping.ReceiveTimeout := 3000; // 5s
+//  Ping.ReceiveTimeout := 3000; // 5s
 
   try
     Ping.Host := HostIP;
