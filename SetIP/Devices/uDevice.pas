@@ -51,7 +51,7 @@ type
     destructor Destroy; override;
 
     property TR40: TTR40 read FTR40;
-    property OP40: TIO40 read FIO40;
+    property IO40: TIO40 read FIO40;
 
   public
     procedure LoadFromFile;

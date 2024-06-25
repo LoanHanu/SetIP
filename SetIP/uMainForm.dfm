@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'MainForm'
-  ClientHeight = 562
-  ClientWidth = 839
+  ClientHeight = 561
+  ClientWidth = 825
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -33,27 +33,25 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 839
-    Height = 562
-    ActivePage = SheetTR40
+    Width = 825
+    Height = 561
+    ActivePage = SheetIO40
     Align = alClient
     TabOrder = 0
-    ExplicitWidth = 786
-    ExplicitHeight = 561
+    OnChange = PageControlChange
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        831
-        532)
+        817
+        531)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 793
+        Width = 779
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
-        ExplicitWidth = 740
         object Label1: TLabel
           AlignWithMargins = True
           Left = 5
@@ -259,12 +257,11 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 793
+        Width = 779
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
-        ExplicitWidth = 740
         object Label2: TLabel
           AlignWithMargins = True
           Left = 5
@@ -305,7 +302,7 @@ object MainForm: TMainForm
           Caption = 'Default Gateway: '
           Visible = False
         end
-        object ImageTR40SetIPLed: TImage
+        object ImageTR40ChangeIPLed: TImage
           Left = 385
           Top = 59
           Width = 24
@@ -817,12 +814,11 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 793
+        Width = 779
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
-        ExplicitWidth = 740
         object Label10: TLabel
           Left = 3
           Top = 16
@@ -991,7 +987,7 @@ object MainForm: TMainForm
           TabOrder = 10
           OnClick = ButtonTR40InputClick
         end
-        object ButtonTR40Disconnect: TButton
+        object ButtonTR40SshDisconnect: TButton
           Left = 153
           Top = 176
           Width = 106
@@ -999,7 +995,7 @@ object MainForm: TMainForm
           Caption = 'DisConnect'
           ImageIndex = 0
           TabOrder = 11
-          OnClick = ButtonTR40DisconnectClick
+          OnClick = ButtonTR40SshDisconnectClick
         end
       end
     end
@@ -1007,17 +1003,16 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        831
-        532)
+        817
+        531)
       object GroupBox3: TGroupBox
         Left = 3
-        Top = 3
-        Width = 797
+        Top = 114
+        Width = 802
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
-        ExplicitWidth = 748
         object Label6: TLabel
           AlignWithMargins = True
           Left = 5
@@ -1086,7 +1081,6 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
-            ReadOnly = True
             TabOrder = 4
             Text = '2'
           end
@@ -1130,7 +1124,6 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
-            ReadOnly = True
             TabOrder = 3
             Text = '1'
           end
@@ -1174,7 +1167,6 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
-            ReadOnly = True
             TabOrder = 2
             Text = '168'
           end
@@ -1218,7 +1210,6 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
-            ReadOnly = True
             TabOrder = 1
             Text = '192'
           end
@@ -1226,13 +1217,12 @@ object MainForm: TMainForm
       end
       object GroupBox4: TGroupBox
         Left = 3
-        Top = 279
-        Width = 797
+        Top = 390
+        Width = 802
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
-        ExplicitWidth = 748
         object Label7: TLabel
           AlignWithMargins = True
           Left = 5
@@ -1273,7 +1263,7 @@ object MainForm: TMainForm
           Caption = 'Default Gateway: '
           Visible = False
         end
-        object ImageIO40SetLed: TImage
+        object ImageIO40ChangeIPLed: TImage
           Left = 385
           Top = 60
           Width = 24
@@ -1309,6 +1299,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '2'
+            ExplicitTop = 9
           end
           object Edit15: TEdit
             AlignWithMargins = True
@@ -1783,13 +1774,12 @@ object MainForm: TMainForm
       end
       object GroupBox6: TGroupBox
         Left = 3
-        Top = 63
-        Width = 797
+        Top = 174
+        Width = 802
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
-        ExplicitWidth = 748
         object Label16: TLabel
           Left = 3
           Top = 16
@@ -1908,7 +1898,7 @@ object MainForm: TMainForm
           TabOrder = 5
           OnChange = EditTR40UserChange
         end
-        object ButtonIO40Connect: TButton
+        object ButtonIO40SshConnect: TButton
           Left = 13
           Top = 176
           Width = 86
@@ -1917,7 +1907,7 @@ object MainForm: TMainForm
           ImageIndex = 0
           Images = IconList
           TabOrder = 6
-          OnClick = ButtonTR40SshConnectClick
+          OnClick = ButtonIO40SshConnectClick
         end
         object EditIO40Pass: TButtonedEdit
           Left = 105
@@ -1929,7 +1919,7 @@ object MainForm: TMainForm
           RightButton.ImageIndex = 2
           RightButton.Visible = True
           TabOrder = 7
-          OnRightButtonClick = EditTR40PassRightButtonClick
+          OnRightButtonClick = EditIO40PassRightButtonClick
         end
         object MemoIO40Output: TMemo
           Left = 392
@@ -1958,7 +1948,7 @@ object MainForm: TMainForm
           TabOrder = 10
           OnClick = ButtonTR40InputClick
         end
-        object ButtonIO40Disconnect: TButton
+        object ButtonIO40SshDisconnect: TButton
           Left = 135
           Top = 176
           Width = 86
@@ -1966,14 +1956,78 @@ object MainForm: TMainForm
           Caption = 'DisConnect'
           ImageIndex = 0
           TabOrder = 11
-          OnClick = ButtonTR40SshConnectClick
+          OnClick = ButtonIO40SshDisconnectClick
+        end
+      end
+      object GroupBox7: TGroupBox
+        Left = 3
+        Top = 3
+        Width = 806
+        Height = 105
+        Caption = 'Set IP on MAC'
+        TabOrder = 3
+        object Label25: TLabel
+          Left = 3
+          Top = 24
+          Width = 71
+          Height = 15
+          Caption = 'Mac Address:'
+        end
+        object Label26: TLabel
+          Left = 3
+          Top = 53
+          Width = 58
+          Height = 15
+          Caption = 'IP Address:'
+        end
+        object EditIO40Mac: TEdit
+          Left = 80
+          Top = 16
+          Width = 190
+          Height = 23
+          TabOrder = 0
+          Text = 'bf:8f:14:00:'
+        end
+        object EditIO40IP: TEdit
+          Left = 80
+          Top = 45
+          Width = 190
+          Height = 23
+          TabOrder = 1
+          Text = '192.168.0.250'
+        end
+        object ButtonIO40SaveSettings: TButton
+          Left = 3
+          Top = 74
+          Width = 126
+          Height = 25
+          Caption = 'Remember Settings'
+          TabOrder = 2
+          OnClick = ButtonIO40SaveSettingsClick
+        end
+        object ButtonIO40SetIP: TButton
+          Left = 142
+          Top = 74
+          Width = 128
+          Height = 25
+          Caption = 'SetIP'
+          TabOrder = 3
+          OnClick = ButtonIO40SetIPClick
+        end
+        object MemoIO40State: TMemo
+          Left = 336
+          Top = 16
+          Width = 441
+          Height = 86
+          Lines.Strings = (
+            'MemoIO40State')
+          TabOrder = 4
         end
       end
     end
   end
   object IconList: TImageList
-    Left = 8
-    Top = 512
+    Left = 144
     Bitmap = {
       494C010104000800040010001000FFFFFFFFFF10FFFFFFFFFFFFFFFF424D3600
       0000000000003600000028000000400000002000000001002000000000000020

@@ -3,13 +3,13 @@ unit uCommonUtils;
 interface
 
 uses
-  Windows, Classes, SysUtils, IdIcmpClient, Vcl.Dialogs;
+  Windows, Classes, SysUtils, IdIcmpClient, Vcl.Dialogs, Winsock2, Winapi.Winsock;
 
 procedure ExecuteCommandLine(Command: string; Output: TStrings);
 
-//procedure ExecuteCommandLine2(Command: string; Output: TStrings; Input: TStrings);
+// procedure ExecuteCommandLine2(Command: string; Output: TStrings; Input: TStrings);
 
-//function TryPing(HostIP: string): Boolean;
+// function TryPing(HostIP: string): Boolean;
 
 implementation
 
@@ -220,5 +220,6 @@ end;
 // Ping.Free;
 // Result := res;
 // end;
+
 
 end.

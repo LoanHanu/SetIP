@@ -12,7 +12,8 @@ uses
   libssh2 in 'Service\libssh2\libssh2.pas',
   LibSsh2Client in 'Service\libssh2\LibSsh2Client.pas',
   SocketUtils in 'Service\libssh2\SocketUtils.pas',
-  uLibSsh2Client in 'Service\uLibSsh2Client.pas';
+  uLibSsh2Client in 'Service\uLibSsh2Client.pas',
+  Winsock2 in 'Service\winsock2\Winsock2.pas';
 
 {$R *.res}
 

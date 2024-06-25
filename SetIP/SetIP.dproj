@@ -112,6 +112,7 @@
         <DCCReference Include="Service\libssh2\LibSsh2Client.pas"/>
         <DCCReference Include="Service\libssh2\SocketUtils.pas"/>
         <DCCReference Include="Service\uLibSsh2Client.pas"/>
+        <DCCReference Include="Service\winsock2\Winsock2.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
