@@ -3,7 +3,7 @@ object MainForm: TMainForm
   Top = 0
   Caption = 'MainForm'
   ClientHeight = 561
-  ClientWidth = 817
+  ClientWidth = 793
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -33,21 +33,21 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 817
+    Width = 793
     Height = 561
-    ActivePage = SheetTR40
+    ActivePage = SheetIO40
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        809
+        785
         531)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 771
+        Width = 779
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -257,7 +257,7 @@ object MainForm: TMainForm
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 771
+        Width = 779
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -495,6 +495,7 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
+            ReadOnly = True
             TabOrder = 4
             Text = '0'
           end
@@ -538,6 +539,7 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
+            ReadOnly = True
             TabOrder = 3
             Text = '255'
           end
@@ -581,6 +583,7 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
+            ReadOnly = True
             TabOrder = 2
             Text = '255'
           end
@@ -624,6 +627,7 @@ object MainForm: TMainForm
             MaxLength = 3
             NumbersOnly = True
             ParentFont = False
+            ReadOnly = True
             TabOrder = 1
             Text = '255'
           end
@@ -814,7 +818,7 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 771
+        Width = 779
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
@@ -1003,12 +1007,12 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        809
+        785
         531)
       object GroupBox3: TGroupBox
         Left = 3
         Top = 114
-        Width = 794
+        Width = 770
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
@@ -1217,8 +1221,8 @@ object MainForm: TMainForm
       end
       object GroupBox4: TGroupBox
         Left = 3
-        Top = 390
-        Width = 794
+        Top = 174
+        Width = 770
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -1771,200 +1775,13 @@ object MainForm: TMainForm
           OnClick = ButtonIO40ChangeIPClick
         end
       end
-      object GroupBox6: TGroupBox
-        Left = 3
-        Top = 174
-        Width = 794
-        Height = 210
-        Anchors = [akLeft, akTop, akRight]
-        Caption = 'SSH Connection'
-        TabOrder = 2
-        object Label16: TLabel
-          Left = 3
-          Top = 16
-          Width = 112
-          Height = 15
-          Caption = 'Authentication Kind: '
-        end
-        object Label18: TLabel
-          Left = 13
-          Top = 63
-          Width = 62
-          Height = 15
-          Caption = 'SSH Server: '
-        end
-        object Label19: TLabel
-          Left = 13
-          Top = 92
-          Width = 52
-          Height = 15
-          Caption = 'SSH Port: '
-        end
-        object Label20: TLabel
-          Left = 13
-          Top = 121
-          Width = 64
-          Height = 15
-          Caption = 'User Name: '
-        end
-        object Label21: TLabel
-          Left = 13
-          Top = 153
-          Width = 53
-          Height = 15
-          Caption = 'Password:'
-        end
-        object Label22: TLabel
-          Left = 392
-          Top = 16
-          Width = 198
-          Height = 15
-          Caption = 'Output(the case of caching host key):'
-        end
-        object Label23: TLabel
-          Left = 392
-          Top = 180
-          Width = 34
-          Height = 15
-          Caption = 'Input: '
-        end
-        object Label24: TLabel
-          Left = 264
-          Top = 181
-          Width = 41
-          Height = 15
-          Caption = 'Ready...'
-          Visible = False
-        end
-        object ImageIO40ConnectLed: TImage
-          Left = 105
-          Top = 176
-          Width = 24
-          Height = 24
-          Center = True
-          Transparent = True
-        end
-        object RadioButton4: TRadioButton
-          Left = 6
-          Top = 37
-          Width = 91
-          Height = 17
-          Caption = 'Password'
-          Checked = True
-          Enabled = False
-          TabOrder = 0
-          TabStop = True
-        end
-        object RadioButton5: TRadioButton
-          Left = 103
-          Top = 37
-          Width = 97
-          Height = 17
-          Caption = 'Public Key'
-          Enabled = False
-          TabOrder = 1
-        end
-        object RadioButton6: TRadioButton
-          Left = 206
-          Top = 37
-          Width = 139
-          Height = 17
-          Caption = 'Keyboard-interactive'
-          Enabled = False
-          TabOrder = 2
-        end
-        object EditIO40HostIP: TEdit
-          Left = 105
-          Top = 60
-          Width = 240
-          Height = 23
-          TabOrder = 3
-          Text = 'localhost'
-        end
-        object EditIO40SshPort: TEdit
-          Left = 105
-          Top = 89
-          Width = 240
-          Height = 23
-          TabOrder = 4
-          Text = '22'
-        end
-        object EditIO40User: TEdit
-          Left = 105
-          Top = 118
-          Width = 240
-          Height = 23
-          TabOrder = 5
-          OnChange = EditTR40UserChange
-        end
-        object ButtonIO40SshConnect: TButton
-          Left = 13
-          Top = 176
-          Width = 86
-          Height = 25
-          Caption = 'Connect'
-          ImageIndex = 0
-          Images = IconList
-          TabOrder = 6
-          OnClick = ButtonIO40SshConnectClick
-        end
-        object EditIO40Pass: TButtonedEdit
-          Left = 105
-          Top = 147
-          Width = 240
-          Height = 23
-          Images = IconList
-          PasswordChar = '*'
-          RightButton.ImageIndex = 2
-          RightButton.Visible = True
-          TabOrder = 7
-          OnRightButtonClick = EditIO40PassRightButtonClick
-        end
-        object MemoIO40Output: TMemo
-          Left = 392
-          Top = 37
-          Width = 385
-          Height = 132
-          ReadOnly = True
-          ScrollBars = ssBoth
-          TabOrder = 8
-        end
-        object EditIO40Input: TEdit
-          Left = 439
-          Top = 176
-          Width = 257
-          Height = 23
-          Enabled = False
-          TabOrder = 9
-        end
-        object ButtonIO40Input: TButton
-          Left = 702
-          Top = 175
-          Width = 75
-          Height = 25
-          Caption = 'Input'
-          Enabled = False
-          TabOrder = 10
-          OnClick = ButtonTR40InputClick
-        end
-        object ButtonIO40SshDisconnect: TButton
-          Left = 135
-          Top = 176
-          Width = 86
-          Height = 25
-          Caption = 'DisConnect'
-          ImageIndex = 0
-          TabOrder = 11
-          OnClick = ButtonIO40SshDisconnectClick
-        end
-      end
       object GroupBox7: TGroupBox
         Left = 3
         Top = 3
         Width = 806
         Height = 105
         Caption = 'Set IP on MAC'
-        TabOrder = 3
+        TabOrder = 2
         object Label25: TLabel
           Left = 3
           Top = 24

@@ -67,7 +67,7 @@ begin
             -o UserKnownHostsFile=/dev/null //To ignore the user known hosts file
             -o StrictHostKeyChecking=no //To ignore host key checking
           }
-          CommandLine := Format('%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s -p %d -l %s', [FProcessPath, FHostName, FPort, FUser]);
+          CommandLine := Format('%s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s -p %d -l %s', [FProcessPath, FHostIP, FPort, FUser]);
           Self.FDosCommand.CommandLine := CommandLine;
           Self.FDosCommand.Execute;
           Self.FIsConnecting := True;

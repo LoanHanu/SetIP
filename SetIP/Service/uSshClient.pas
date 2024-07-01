@@ -11,7 +11,9 @@ type
   TSshClient = class
   protected
     FProcessPath: string;
-    FHostName: string;
+    FHostIP: string;
+    FHostMask: string;
+    FHostGate: string;
     FPort: integer;
     FUser: string;
     FPassword: string;
@@ -37,7 +39,9 @@ type
 
   public
     property ProcessPath: string read FProcessPath write FProcessPath;
-    property HostName: string read FHostName write FHostName;
+    property HostIP: string read FHostIP write FHostIP;
+    property HostMask: string read FHostMask write FHostMask;
+    property HostGate: string read FHostGate write FHostGate;
     property Port: integer read FPort write FPort;
     property User: string read FUser write FUser;
     property Password: string read FPassword write FPassword;
@@ -53,7 +57,7 @@ implementation
 
 constructor TSshClient.Create;
 begin
-  FHostName := 'localhost'; // or host ip address
+  FHostIP := 'localhost'; // or host ip address
   FPort := 22;
   FIsConnecting := False;
   FIsConnected := False;

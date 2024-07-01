@@ -46,7 +46,7 @@ end;
 
 procedure TLibSsh2Client.Connect;
 begin
-  SshSession := CreateSession(Self.HostName, Self.FPort);
+  SshSession := CreateSession(Self.HostIP, Self.FPort);
   // Session.UseCompression := True;
   SshSession.SetKeybInteractiveCallback(LibSsh2KeybIntCallback);
 
@@ -93,8 +93,12 @@ begin
   if Self.FIsConnected then
   begin
     try
+      SshExec.Exec('abcdefg', cmdResult, ErrOutput, ExitCode);
+      cmdResult := cmdResult.Trim;
+
       SshExec.Exec('nmcli device status', cmdResult, ErrOutput, ExitCode);
       cmdResult := cmdResult.Trim;
+
       if cmdResult.Contains(#13#10) then
       begin
         Lines := cmdResult.Split([#13#10]);

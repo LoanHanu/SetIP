@@ -120,30 +120,8 @@ type
     ImageTR40PingLed: TImage;
     ImageTR40ConnectLed: TImage;
     ImageTR40ChangeIPLed: TImage;
-    GroupBox6: TGroupBox;
-    Label16: TLabel;
-    Label18: TLabel;
-    Label19: TLabel;
-    Label20: TLabel;
-    Label21: TLabel;
-    Label22: TLabel;
-    Label23: TLabel;
-    Label24: TLabel;
-    ImageIO40ConnectLed: TImage;
-    RadioButton4: TRadioButton;
-    RadioButton5: TRadioButton;
-    RadioButton6: TRadioButton;
-    EditIO40HostIP: TEdit;
-    EditIO40SshPort: TEdit;
-    EditIO40User: TEdit;
-    ButtonIO40SshConnect: TButton;
-    EditIO40Pass: TButtonedEdit;
-    MemoIO40Output: TMemo;
-    EditIO40Input: TEdit;
-    ButtonIO40Input: TButton;
     ImageIO40PingLed: TImage;
     ImageIO40ChangeIPLed: TImage;
-    ButtonIO40SshDisconnect: TButton;
     ButtonTR40SshDisconnect: TButton;
     GroupBox7: TGroupBox;
     Label25: TLabel;
@@ -191,7 +169,6 @@ type
   private
     FDeviceManager: TDeviceManager;
     FTR40SshClient: TSshClient;
-    FIO40SshClient: TSshClient;
 
     TxData: array [0 .. 125] of Cardinal;
     RxData: array [0 .. 125] of Cardinal;
@@ -405,8 +382,12 @@ begin
   // Self.FSshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
   // Self.FSshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
 
-  Self.FTR40SshClient := TLibSsh2Client.Create;
-  Self.FIO40SshClient := TLibSsh2Client.Create;
+  // Self.FTR40SshClient := TLibSsh2Client.Create;
+
+  Self.FTR40SshClient := TPuttySshClient.Create;
+  Self.FTR40SshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  Self.FTR40SshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  Self.FTR40SshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
 
   { winsock2 }
   if not LoadWinSock2(True) then
@@ -423,7 +404,6 @@ begin
   //
   FreeAndNil(Self.FDeviceManager);
   FreeAndNil(Self.FTR40SshClient);
-  FreeAndNil(Self.FIO40SshClient);
 
   FreeMemory(pAdapterInfo);
 end;
@@ -576,34 +556,55 @@ begin
     if FTR40SshClient.IsConnecting and ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
     begin
       FTR40SshClient.DosCommand.SendLine('y', True);
-      FTR40SshClient.IsConnecting := false;
+      // FTR40SshClient.IsConnecting := false;
     end;
 
-    if FTR40SshClient.IsConnecting and ANewLine.Contains('password:') then
+    // if FTR40SshClient.IsConnecting and ANewLine.Contains('password:') then
 
-      if ANewLine.Contains('Last login:') then
+    if FTR40SshClient.IsConnecting and ANewLine.Contains('Access granted. Press Return to begin session.') then
+    begin
+      FTR40SshClient.DosCommand.SendLine('', True); // Enter key
+    end;
+
+    if FTR40SshClient.IsConnecting and ANewLine.Contains('Last login:') then
+    begin
+      Self.FTR40SshClient.IsConnecting := false;
+      Self.FTR40SshClient.IsConnected := True;
+
+      if Self.PageControl.ActivePage = Self.SheetTR40 then
       begin
-        Self.FTR40SshClient.IsConnected := True;
+        FDeviceManager.TR40.IpAddress := Self.EditTR40HostIP.Text;
+        FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+        FDeviceManager.TR40.User := Self.EditTR40User.Text;
+        FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
 
-        if Self.PageControl.ActivePage = Self.SheetTR40 then
+        if FTR40SshClient.IsConnected then
         begin
           FDeviceManager.TR40.IpAddress := Self.EditTR40HostIP.Text;
           FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
           FDeviceManager.TR40.User := Self.EditTR40User.Text;
           FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
-        end
-        else if Self.PageControl.ActivePage = Self.SheetIO40 then
-        begin
 
+          Self.FDeviceManager.SaveToFile;
+
+          Self.ButtonTR40SshConnect.ImageIndex := 1;
+          Self.IconList.GetBitmap(1, bmp);
+          Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+        end
+        else
+        begin
+          Self.ButtonTR40SshConnect.ImageIndex := 0;
+          Self.IconList.GetBitmap(0, bmp);
+          Self.ImageTR40ConnectLed.Picture.Assign(bmp);
         end;
 
-        Self.FDeviceManager.SaveToFile;
-
-        Self.ButtonTR40SshConnect.ImageIndex := 1;
-        Self.IconList.GetBitmap(1, bmp);
-        Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+      end
+      else if Self.PageControl.ActivePage = Self.SheetIO40 then
+      begin
 
       end;
+
+    end;
 
     if Self.FTR40SshClient.IsConnected and ANewLine.Contains('logout') then
     begin
@@ -652,13 +653,15 @@ var
 begin
   if FTR40SshClient.IsConnected then
   begin
-    ShowMessage('The SSH Client already connected to any host');
+    ShowMessage('The SSH Client already connected to host');
     exit;
   end;
 
   Self.MemoTR40Output.Clear;
 
-  Self.FTR40SshClient.HostName := Self.EditTR40HostIP.Text;
+  Self.FTR40SshClient.HostIP := Self.EditTR40HostIP.Text;
+  // Self.FTR40SshClient.HostMask := Self.FDeviceManager.TR40.SubnetMask;
+  // Self.FTR40SshClient.HostGate := Self.FDeviceManager.TR40.DefaultGateway;
   Self.FTR40SshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
   Self.FTR40SshClient.User := Self.EditTR40User.Text;
   Self.FTR40SshClient.Password := Self.EditTR40Pass.Text;
@@ -669,7 +672,7 @@ begin
     Screen.Cursor := crHourGlass;
     try
       // try ping first
-      if not FTR40SshClient.TryPing(FTR40SshClient.HostName) then
+      if not FTR40SshClient.TryPing(FTR40SshClient.HostIP) then
       begin
         ShowMessage('Can not ping to host');
         exit;
@@ -717,18 +720,18 @@ var
   OldCursor: TCursor;
   bmp: TBitmap;
 begin
-  if FIO40SshClient.IsConnected then
-  begin
-    ShowMessage('The SSH Client already connected to any host');
-    exit;
-  end;
+  // if FIO40SshClient.IsConnected then
+  // begin
+  // ShowMessage('The SSH Client already connected to any host');
+  // exit;
+  // end;
 
   Self.MemoIO40Output.Clear;
 
-  Self.FIO40SshClient.HostName := Self.EditIO40HostIP.Text;
-  Self.FIO40SshClient.Port := StrToIntDef(Self.EditIO40SshPort.Text, 22);
-  Self.FIO40SshClient.User := Self.EditIO40User.Text;
-  Self.FIO40SshClient.Password := Self.EditIO40Pass.Text;
+  // Self.FIO40SshClient.HostName := Self.EditIO40HostIP.Text;
+  // Self.FIO40SshClient.Port := StrToIntDef(Self.EditIO40SshPort.Text, 22);
+  // Self.FIO40SshClient.User := Self.EditIO40User.Text;
+  // Self.FIO40SshClient.Password := Self.EditIO40Pass.Text;
 
   bmp := TBitmap.Create;
   OldCursor := Screen.Cursor;
@@ -736,37 +739,37 @@ begin
     Screen.Cursor := crHourGlass;
     try
       // try ping first
-      if not FIO40SshClient.TryPing(FIO40SshClient.HostName) then
-      begin
-        ShowMessage('Can not ping to host');
-        exit;
-      end;
+      // if not FIO40SshClient.TryPing(FIO40SshClient.HostName) then
+      // begin
+      // ShowMessage('Can not ping to host');
+      // exit;
+      // end;
 
       Self.ButtonIO40SshConnect.ImageIndex := 0;
       Self.IconList.GetBitmap(0, bmp);
       Self.ImageIO40ConnectLed.Picture.Assign(bmp);
 
-      FIO40SshClient.Connect;
+      // FIO40SshClient.Connect;
 
-      if FIO40SshClient.IsConnected then
-      begin
-        FDeviceManager.IO40.IpAddress := Self.EditIO40HostIP.Text;
-        FDeviceManager.IO40.SshPort := StrToIntDef(Self.EditIO40SshPort.Text, 22);
-        FDeviceManager.IO40.User := Self.EditIO40User.Text;
-        FDeviceManager.IO40.Password := Self.EditIO40Pass.Text;
-
-        Self.FDeviceManager.SaveToFile;
-
-        Self.ButtonIO40SshConnect.ImageIndex := 1;
-        Self.IconList.GetBitmap(1, bmp);
-        Self.ImageIO40ConnectLed.Picture.Assign(bmp);
-      end
-      else
-      begin
-        Self.ButtonIO40SshConnect.ImageIndex := 0;
-        Self.IconList.GetBitmap(0, bmp);
-        Self.ImageIO40ConnectLed.Picture.Assign(bmp);
-      end;
+      // if FIO40SshClient.IsConnected then
+      // begin
+      // FDeviceManager.IO40.IpAddress := Self.EditIO40HostIP.Text;
+      // FDeviceManager.IO40.SshPort := StrToIntDef(Self.EditIO40SshPort.Text, 22);
+      // FDeviceManager.IO40.User := Self.EditIO40User.Text;
+      // FDeviceManager.IO40.Password := Self.EditIO40Pass.Text;
+      //
+      // Self.FDeviceManager.SaveToFile;
+      //
+      // Self.ButtonIO40SshConnect.ImageIndex := 1;
+      // Self.IconList.GetBitmap(1, bmp);
+      // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+      // end
+      // else
+      // begin
+      // Self.ButtonIO40SshConnect.ImageIndex := 0;
+      // Self.IconList.GetBitmap(0, bmp);
+      // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+      // end;
 
     finally
 
@@ -785,16 +788,16 @@ var
 begin
   //
   bmp := TBitmap.Create;
-  if Self.FIO40SshClient.IsConnected then
-  begin
-    Self.FIO40SshClient.DisConnect;
-
-    Self.FIO40SshClient.IsConnected := false;
-
-    Self.ButtonIO40SshConnect.ImageIndex := 0;
-    Self.IconList.GetBitmap(0, bmp);
-    Self.ImageIO40ConnectLed.Picture.Assign(bmp);
-  end;
+  // if Self.FIO40SshClient.IsConnected then
+  // begin
+  // Self.FIO40SshClient.DisConnect;
+  //
+  // Self.FIO40SshClient.IsConnected := false;
+  //
+  // Self.ButtonIO40SshConnect.ImageIndex := 0;
+  // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+  // end;
   bmp.Free;
 end;
 
@@ -952,54 +955,54 @@ begin
 
   bmp := TBitmap.Create;
 
-  if Self.FIO40SshClient.IsConnected then
-  begin
-
-    if Self.FIO40SshClient.ChangeIP(newIP, newMask, newGate) then
-    begin
-      // set set ip led on
-      Self.ButtonIO40ChangeIP.ImageIndex := 1;
-      Self.IconList.GetBitmap(1, bmp);
-      Self.ImageIO40ChangeIPLed.Picture.Assign(bmp);
-
-      Self.FDeviceManager.IO40.IpAddress := newIP;
-      Self.FDeviceManager.IO40.SubnetMask := newMask;
-      Self.FDeviceManager.SaveToFile;
-
-      Self.FIO40SshClient.IsConnected := false; // set to False on new IP
-
-      // set ping led off
-      Self.ButtonIO40Ping.ImageIndex := 0;
-      Self.IconList.GetBitmap(0, bmp);
-      Self.ImageIO40PingLed.Picture.Assign(bmp);
-
-      // Set connect led off
-      Self.ButtonIO40SshConnect.ImageIndex := 0;
-      Self.IconList.GetBitmap(0, bmp);
-      Self.ImageIO40ConnectLed.Picture.Assign(bmp);
-
-      // reload...
-      Self.InitUI;
-    end;
-
-  end
-  else
-  begin
-    Self.ButtonIO40ChangeIP.ImageIndex := 0;
-    Self.IconList.GetBitmap(0, bmp);
-    Self.ImageIO40ChangeIPLed.Picture.Assign(bmp);
-
-    // set ping & connection leds to off
-    Self.ButtonIO40Ping.ImageIndex := 0;
-    // Self.IconList.GetBitmap(0, bmp);
-    Self.ImageIO40PingLed.Picture.Assign(bmp);
-
-    Self.ButtonIO40SshConnect.ImageIndex := 0;
-    // Self.IconList.GetBitmap(0, bmp);
-    Self.ImageIO40ConnectLed.Picture.Assign(bmp);
-
-    ShowMessage('Not connected yet. Please try connect first.');
-  end;
+  // if Self.FIO40SshClient.IsConnected then
+  // begin
+  //
+  // if Self.FIO40SshClient.ChangeIP(newIP, newMask, newGate) then
+  // begin
+  // // set set ip led on
+  // Self.ButtonIO40ChangeIP.ImageIndex := 1;
+  // Self.IconList.GetBitmap(1, bmp);
+  // Self.ImageIO40ChangeIPLed.Picture.Assign(bmp);
+  //
+  // Self.FDeviceManager.IO40.IpAddress := newIP;
+  // Self.FDeviceManager.IO40.SubnetMask := newMask;
+  // Self.FDeviceManager.SaveToFile;
+  //
+  // Self.FIO40SshClient.IsConnected := false; // set to False on new IP
+  //
+  // // set ping led off
+  // Self.ButtonIO40Ping.ImageIndex := 0;
+  // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40PingLed.Picture.Assign(bmp);
+  //
+  // // Set connect led off
+  // Self.ButtonIO40SshConnect.ImageIndex := 0;
+  // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+  //
+  // // reload...
+  // Self.InitUI;
+  // end;
+  //
+  // end
+  // else
+  // begin
+  // Self.ButtonIO40ChangeIP.ImageIndex := 0;
+  // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40ChangeIPLed.Picture.Assign(bmp);
+  //
+  // // set ping & connection leds to off
+  // Self.ButtonIO40Ping.ImageIndex := 0;
+  // // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40PingLed.Picture.Assign(bmp);
+  //
+  // Self.ButtonIO40SshConnect.ImageIndex := 0;
+  // // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+  //
+  // ShowMessage('Not connected yet. Please try connect first.');
+  // end;
 
   bmp.Free;
   Screen.Cursor := OldCursor;
@@ -1054,18 +1057,18 @@ begin
 
   bmp := TBitmap.Create;
   CurrIP := Format('%s.%s.%s.%s', [EditIO40CurrIPOctet1.Text, EditIO40CurrIPOctet2.Text, EditIO40CurrIPOctet3.Text, EditIO40CurrIPOctet4.Text]);
-  if Self.FIO40SshClient.TryPing(CurrIP) then
-  begin
-    Self.ButtonIO40Ping.ImageIndex := 1;
-    Self.IconList.GetBitmap(1, bmp);
-    Self.ImageIO40PingLed.Picture.Assign(bmp);
-  end
-  else
-  begin
-    Self.ButtonIO40Ping.ImageIndex := 0;
-    Self.IconList.GetBitmap(0, bmp);
-    Self.ImageIO40PingLed.Picture.Assign(bmp);
-  end;
+  // if Self.FIO40SshClient.TryPing(CurrIP) then
+  // begin
+  // Self.ButtonIO40Ping.ImageIndex := 1;
+  // Self.IconList.GetBitmap(1, bmp);
+  // Self.ImageIO40PingLed.Picture.Assign(bmp);
+  // end
+  // else
+  // begin
+  // Self.ButtonIO40Ping.ImageIndex := 0;
+  // Self.IconList.GetBitmap(0, bmp);
+  // Self.ImageIO40PingLed.Picture.Assign(bmp);
+  // end;
 
   bmp.Free;
 
@@ -1164,11 +1167,11 @@ begin
   begin
     Self.FTR40SshClient.DisConnect;
 
-    Self.FTR40SshClient.IsConnected := false;
-
-    Self.ButtonTR40SshConnect.ImageIndex := 0;
-    Self.IconList.GetBitmap(0, bmp);
-    Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    // Self.FTR40SshClient.IsConnected := false;
+    //
+    // Self.ButtonTR40SshConnect.ImageIndex := 0;
+    // Self.IconList.GetBitmap(0, bmp);
+    // Self.ImageTR40ConnectLed.Picture.Assign(bmp);
   end;
   bmp.Free;
 end;
