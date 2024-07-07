@@ -131,9 +131,18 @@ type
     ButtonIO40SaveSettings: TButton;
     ButtonIO40SetIP: TButton;
     MemoIO40State: TMemo;
+    ImageIsTR40: TImage;
+    Label16: TLabel;
+    Label18: TLabel;
+    EditTR40MacAddr: TEdit;
+    Label19: TLabel;
+    ImageIsIO40: TImage;
+    Label20: TLabel;
+    EditIO40MacAddr: TEdit;
 
     procedure OctetEditExit(Sender: TObject);
     procedure OctetChange(Sender: TObject);
+    procedure OctetKeyPress(Sender: TObject; var Key: Char);
 
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -167,8 +176,8 @@ type
     procedure PageControlChange(Sender: TObject);
 
   private
-    FDeviceManager: TDeviceManager;
-    FTR40SshClient: TSshClient;
+    FDevice: TDeviceManager;
+    // FTR40SshClient: TSshClient;
 
     TxData: array [0 .. 125] of Cardinal;
     RxData: array [0 .. 125] of Cardinal;
@@ -282,10 +291,10 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   i: Integer;
 begin
-  // Self.EditTR40CurrIPOctet1.OnExit := Self.OctetEditExit;
-  // Self.EditTR40CurrIPOctet2.OnExit := Self.OctetEditExit;
-  // Self.EditTR40CurrIPOctet3.OnExit := Self.OctetEditExit;
-  // Self.EditTR40CurrIPOctet4.OnExit := Self.OctetEditExit;
+  Self.EditTR40CurrIPOctet1.OnExit := Self.OctetEditExit;
+  Self.EditTR40CurrIPOctet2.OnExit := Self.OctetEditExit;
+  Self.EditTR40CurrIPOctet3.OnExit := Self.OctetEditExit;
+  Self.EditTR40CurrIPOctet4.OnExit := Self.OctetEditExit;
 
   EditTR40NewIPOctet1.OnExit := OctetEditExit;
   EditTR40NewIPOctet2.OnExit := OctetEditExit;
@@ -302,10 +311,10 @@ begin
   EditTR40NewGateOctet3.OnExit := OctetEditExit;
   EditTR40NewGateOctet4.OnExit := OctetEditExit;
 
-  // Self.EditOP40CurrIPOctet1.OnExit := Self.OctetEditExit;
-  // Self.EditOP40CurrIPOctet2.OnExit := Self.OctetEditExit;
-  // Self.EditOP40CurrIPOctet3.OnExit := Self.OctetEditExit;
-  // Self.EditOP40CurrIPOctet4.OnExit := Self.OctetEditExit;
+  Self.EditIO40CurrIPOctet1.OnExit := Self.OctetEditExit;
+  Self.EditIO40CurrIPOctet2.OnExit := Self.OctetEditExit;
+  Self.EditIO40CurrIPOctet3.OnExit := Self.OctetEditExit;
+  Self.EditIO40CurrIPOctet4.OnExit := Self.OctetEditExit;
 
   EditIO40NewIPOctet1.OnExit := OctetEditExit;
   EditIO40NewIPOctet2.OnExit := OctetEditExit;
@@ -322,10 +331,10 @@ begin
   EditIO40NewGateOctet3.OnExit := OctetEditExit;
   EditIO40NewGateOctet4.OnExit := OctetEditExit;
 
-  // Self.EditTR40CurrIPOctet1.OnChange := Self.OctetChange;
-  // Self.EditTR40CurrIPOctet2.OnChange := Self.OctetChange;
-  // Self.EditTR40CurrIPOctet3.OnChange := Self.OctetChange;
-  // Self.EditTR40CurrIPOctet4.OnChange := Self.OctetChange;
+  Self.EditTR40CurrIPOctet1.OnChange := Self.OctetChange;
+  Self.EditTR40CurrIPOctet2.OnChange := Self.OctetChange;
+  Self.EditTR40CurrIPOctet3.OnChange := Self.OctetChange;
+  Self.EditTR40CurrIPOctet4.OnChange := Self.OctetChange;
 
   EditTR40NewIPOctet1.OnChange := OctetChange;
   EditTR40NewIPOctet2.OnChange := OctetChange;
@@ -342,10 +351,10 @@ begin
   EditTR40NewGateOctet3.OnChange := OctetChange;
   EditTR40NewGateOctet4.OnChange := OctetChange;
 
-  // Self.EditOP40CurrIPOctet1.OnChange := Self.OctetChange;
-  // Self.EditOP40CurrIPOctet2.OnChange := Self.OctetChange;
-  // Self.EditOP40CurrIPOctet3.OnChange := Self.OctetChange;
-  // Self.EditOP40CurrIPOctet4.OnChange := Self.OctetChange;
+  Self.EditIO40CurrIPOctet1.OnChange := Self.OctetChange;
+  Self.EditIO40CurrIPOctet2.OnChange := Self.OctetChange;
+  Self.EditIO40CurrIPOctet3.OnChange := Self.OctetChange;
+  Self.EditIO40CurrIPOctet4.OnChange := Self.OctetChange;
 
   EditIO40NewIPOctet1.OnChange := OctetChange;
   EditIO40NewIPOctet2.OnChange := OctetChange;
@@ -362,6 +371,46 @@ begin
   EditIO40NewGateOctet3.OnChange := OctetChange;
   EditIO40NewGateOctet4.OnChange := OctetChange;
 
+  Self.EditTR40CurrIPOctet1.OnKeyPress := Self.OctetKeyPress;
+  Self.EditTR40CurrIPOctet2.OnKeyPress := Self.OctetKeyPress;
+  Self.EditTR40CurrIPOctet3.OnKeyPress := Self.OctetKeyPress;
+  Self.EditTR40CurrIPOctet4.OnKeyPress := Self.OctetKeyPress;
+
+  EditTR40NewIPOctet1.OnKeyPress := OctetKeyPress;
+  EditTR40NewIPOctet2.OnKeyPress := OctetKeyPress;
+  EditTR40NewIPOctet3.OnKeyPress := OctetKeyPress;
+  EditTR40NewIPOctet4.OnKeyPress := OctetKeyPress;
+
+  EditTR40NewMaskOctet1.OnKeyPress := OctetKeyPress;
+  EditTR40NewMaskOctet2.OnKeyPress := OctetKeyPress;
+  EditTR40NewMaskOctet3.OnKeyPress := OctetKeyPress;
+  EditTR40NewMaskOctet4.OnKeyPress := OctetKeyPress;
+
+  EditTR40NewGateOctet1.OnKeyPress := OctetKeyPress;
+  EditTR40NewGateOctet2.OnKeyPress := OctetKeyPress;
+  EditTR40NewGateOctet3.OnKeyPress := OctetKeyPress;
+  EditTR40NewGateOctet4.OnKeyPress := OctetKeyPress;
+
+  Self.EditIO40CurrIPOctet1.OnKeyPress := Self.OctetKeyPress;
+  Self.EditIO40CurrIPOctet2.OnKeyPress := Self.OctetKeyPress;
+  Self.EditIO40CurrIPOctet3.OnKeyPress := Self.OctetKeyPress;
+  Self.EditIO40CurrIPOctet4.OnKeyPress := Self.OctetKeyPress;
+
+  EditIO40NewIPOctet1.OnKeyPress := OctetKeyPress;
+  EditIO40NewIPOctet2.OnKeyPress := OctetKeyPress;
+  EditIO40NewIPOctet3.OnKeyPress := OctetKeyPress;
+  EditIO40NewIPOctet4.OnKeyPress := OctetKeyPress;
+
+  EditIO40NewMaskOctet1.OnKeyPress := OctetKeyPress;
+  EditIO40NewMaskOctet2.OnKeyPress := OctetKeyPress;
+  EditIO40NewMaskOctet3.OnKeyPress := OctetKeyPress;
+  EditIO40NewMaskOctet4.OnKeyPress := OctetKeyPress;
+
+  EditIO40NewGateOctet1.OnKeyPress := OctetKeyPress;
+  EditIO40NewGateOctet2.OnKeyPress := OctetKeyPress;
+  EditIO40NewGateOctet3.OnKeyPress := OctetKeyPress;
+  EditIO40NewGateOctet4.OnKeyPress := OctetKeyPress;
+
   EditTR40Pass.RightButton.Enabled := True;
   EditTR40Pass.RightButton.Visible := True;
   EditTR40Pass.RightButton.ImageIndex := 2; // closed eye
@@ -369,7 +418,7 @@ begin
 
   Self.PageControl.ActivePage := Self.SheetTR40;
 
-  Self.FDeviceManager := TDeviceManager.Create;
+  Self.FDevice := TDeviceManager.Create;
   // Self.FDeviceManager.LoadFromFile;
 
   // Self.FSshClient := TPuttySshClient.Create;
@@ -384,10 +433,13 @@ begin
 
   // Self.FTR40SshClient := TLibSsh2Client.Create;
 
-  Self.FTR40SshClient := TPuttySshClient.Create;
-  Self.FTR40SshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
-  Self.FTR40SshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
-  Self.FTR40SshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
+  // Self.FTR40SshClient := TPuttySshClient.Create;
+  // Self.FTR40SshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  // Self.FTR40SshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  // Self.FTR40SshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
+  // Self.FDevice.TR40.SshClient.DosCommand.OnStarted := SshClientDosCommandStarted;
+  // Self.FDevice.TR40.SshClient.DosCommand.OnNewLine := SshClientDosCommandNewLine;
+  // Self.FDevice.TR40.SshClient.DosCommand.OnTerminated := SshClientDosCommandTerminated;
 
   { winsock2 }
   if not LoadWinSock2(True) then
@@ -402,8 +454,8 @@ end;
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   //
-  FreeAndNil(Self.FDeviceManager);
-  FreeAndNil(Self.FTR40SshClient);
+  FreeAndNil(Self.FDevice);
+  // FreeAndNil(Self.FTR40SshClient);
 
   FreeMemory(pAdapterInfo);
 end;
@@ -416,7 +468,7 @@ end;
 procedure TMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   // save device configuration
-  Self.FDeviceManager.SaveToFile;
+  Self.FDevice.SaveToFile;
 
   Action := TCloseAction.caFree;
 end;
@@ -426,13 +478,13 @@ var
   octets: TArray<string>;
 begin
   // load device info
-  Self.FDeviceManager.LoadFromFile;
+  Self.FDevice.LoadFromFile;
 
 {$REGION TR40}
   if Self.PageControl.ActivePage = SheetTR40 then
   begin
 
-    octets := Self.FDeviceManager.TR40.IpAddress.Split(['.']);
+    octets := Self.FDevice.TR40.IpAddress.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditTR40CurrIPOctet1.Text := octets[0];
@@ -441,12 +493,12 @@ begin
       Self.EditTR40CurrIPOctet4.Text := octets[3];
     end;
 
-    Self.EditTR40HostIP.Text := Self.FDeviceManager.TR40.IpAddress;
-    Self.EditTR40SshPort.Text := Self.FDeviceManager.TR40.SshPort.ToString;
-    Self.EditTR40User.Text := Self.FDeviceManager.TR40.User;
-    Self.EditTR40Pass.Text := Self.FDeviceManager.TR40.Password;
+    Self.EditTR40HostIP.Text := Self.FDevice.TR40.IpAddress;
+    Self.EditTR40SshPort.Text := Self.FDevice.TR40.SshPort.ToString;
+    Self.EditTR40User.Text := Self.FDevice.TR40.User;
+    Self.EditTR40Pass.Text := Self.FDevice.TR40.Password;
 
-    octets := Self.FDeviceManager.TR40.IpAddress.Split(['.']);
+    octets := Self.FDevice.TR40.IpAddress.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditTR40NewIPOctet1.Text := octets[0];
@@ -455,7 +507,7 @@ begin
       Self.EditTR40NewIPOctet4.Text := octets[3];
     end;
 
-    octets := Self.FDeviceManager.TR40.SubnetMask.Split(['.']);
+    octets := Self.FDevice.TR40.SubnetMask.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditTR40NewMaskOctet1.Text := octets[0];
@@ -464,7 +516,7 @@ begin
       Self.EditTR40NewMaskOctet4.Text := octets[3];
     end;
 
-    octets := Self.FDeviceManager.TR40.DefaultGateway.Split(['.']);
+    octets := Self.FDevice.TR40.DefaultGateway.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditTR40NewGateOctet1.Text := octets[0];
@@ -476,11 +528,11 @@ begin
   end
 {$ENDREGION}
   //
-{$REGION OP40 }
+{$REGION IO40 }
   else if Self.PageControl.ActivePage = SheetIO40 then
   begin
 
-    octets := Self.FDeviceManager.IO40.IpAddress.Split(['.']);
+    octets := Self.FDevice.IO40.IpAddress.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditIO40CurrIPOctet1.Text := octets[0];
@@ -489,12 +541,12 @@ begin
       Self.EditIO40CurrIPOctet4.Text := octets[3];
     end;
 
-    Self.EditIO40HostIP.Text := Self.FDeviceManager.IO40.IpAddress;
-    Self.EditIO40SshPort.Text := Self.FDeviceManager.IO40.SshPort.ToString;
-    Self.EditIO40User.Text := Self.FDeviceManager.IO40.User;
-    Self.EditIO40Pass.Text := Self.FDeviceManager.IO40.Password;
+    // Self.EditIO40HostIP.Text := Self.FDeviceManager.IO40.IpAddress;
+    // Self.EditIO40SshPort.Text := Self.FDeviceManager.IO40.SshPort.ToString;
+    // Self.EditIO40User.Text := Self.FDeviceManager.IO40.User;
+    // Self.EditIO40Pass.Text := Self.FDeviceManager.IO40.Password;
 
-    octets := Self.FDeviceManager.IO40.IpAddress.Split(['.']);
+    octets := Self.FDevice.IO40.IpAddress.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditIO40NewIPOctet1.Text := octets[0];
@@ -503,7 +555,7 @@ begin
       Self.EditIO40NewIPOctet4.Text := octets[3];
     end;
 
-    octets := Self.FDeviceManager.IO40.SubnetMask.Split(['.']);
+    octets := Self.FDevice.IO40.SubnetMask.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditIO40NewMaskOctet1.Text := octets[0];
@@ -512,7 +564,7 @@ begin
       Self.EditIO40NewMaskOctet4.Text := octets[3];
     end;
 
-    octets := Self.FDeviceManager.IO40.DefaultGateway.Split(['.']);
+    octets := Self.FDevice.IO40.DefaultGateway.Split(['.']);
     if Length(octets) = 4 then
     begin
       Self.EditIO40NewGateOctet1.Text := octets[0];
@@ -553,39 +605,39 @@ begin
   begin
     Self.MemoTR40Output.Lines.Add(ANewLine);
 
-    if FTR40SshClient.IsConnecting and ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
+    if Self.FDevice.TR40.SshClient.IsConnecting and ANewLine.Contains('Store key in cache? (y/n, Return cancels connection, i for more info)') then
     begin
-      FTR40SshClient.DosCommand.SendLine('y', True);
+      Self.FDevice.TR40.SshClient.DosCommand.SendLine('y', True);
       // FTR40SshClient.IsConnecting := false;
     end;
 
     // if FTR40SshClient.IsConnecting and ANewLine.Contains('password:') then
 
-    if FTR40SshClient.IsConnecting and ANewLine.Contains('Access granted. Press Return to begin session.') then
+    if FDevice.TR40.SshClient.IsConnecting and ANewLine.Contains('Access granted. Press Return to begin session.') then
     begin
-      FTR40SshClient.DosCommand.SendLine('', True); // Enter key
+      FDevice.TR40.SshClient.DosCommand.SendLine('', True); // Enter key
     end;
 
-    if FTR40SshClient.IsConnecting and ANewLine.Contains('Last login:') then
+    if FDevice.TR40.SshClient.IsConnecting and ANewLine.Contains('Last login:') then
     begin
-      Self.FTR40SshClient.IsConnecting := false;
-      Self.FTR40SshClient.IsConnected := True;
+      Self.FDevice.TR40.SshClient.IsConnecting := false;
+      Self.FDevice.TR40.SshClient.IsConnected := True;
 
       if Self.PageControl.ActivePage = Self.SheetTR40 then
       begin
-        FDeviceManager.TR40.IpAddress := Self.EditTR40HostIP.Text;
-        FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
-        FDeviceManager.TR40.User := Self.EditTR40User.Text;
-        FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
+        FDevice.TR40.IpAddress := Self.EditTR40HostIP.Text;
+        FDevice.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+        FDevice.TR40.User := Self.EditTR40User.Text;
+        FDevice.TR40.Password := Self.EditTR40Pass.Text;
 
-        if FTR40SshClient.IsConnected then
+        if FDevice.TR40.SshClient.IsConnected then
         begin
-          FDeviceManager.TR40.IpAddress := Self.EditTR40HostIP.Text;
-          FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
-          FDeviceManager.TR40.User := Self.EditTR40User.Text;
-          FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
+          FDevice.TR40.IpAddress := Self.EditTR40HostIP.Text;
+          FDevice.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+          FDevice.TR40.User := Self.EditTR40User.Text;
+          FDevice.TR40.Password := Self.EditTR40Pass.Text;
 
-          Self.FDeviceManager.SaveToFile;
+          Self.FDevice.SaveToFile;
 
           Self.ButtonTR40SshConnect.ImageIndex := 1;
           Self.IconList.GetBitmap(1, bmp);
@@ -606,9 +658,9 @@ begin
 
     end;
 
-    if Self.FTR40SshClient.IsConnected and ANewLine.Contains('logout') then
+    if Self.FDevice.TR40.SshClient.IsConnected and ANewLine.Contains('logout') then
     begin
-      Self.FTR40SshClient.IsConnected := false;
+      Self.FDevice.TR40.SshClient.IsConnected := false;
 
       Self.ButtonTR40SshConnect.ImageIndex := 0;
       Self.IconList.GetBitmap(0, bmp);
@@ -651,7 +703,7 @@ var
   OldCursor: TCursor;
   bmp: TBitmap;
 begin
-  if FTR40SshClient.IsConnected then
+  if FDevice.TR40.SshClient.IsConnected then
   begin
     ShowMessage('The SSH Client already connected to host');
     exit;
@@ -659,12 +711,12 @@ begin
 
   Self.MemoTR40Output.Clear;
 
-  Self.FTR40SshClient.HostIP := Self.EditTR40HostIP.Text;
+  Self.FDevice.TR40.SshClient.HostIP := Self.EditTR40HostIP.Text;
   // Self.FTR40SshClient.HostMask := Self.FDeviceManager.TR40.SubnetMask;
   // Self.FTR40SshClient.HostGate := Self.FDeviceManager.TR40.DefaultGateway;
-  Self.FTR40SshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
-  Self.FTR40SshClient.User := Self.EditTR40User.Text;
-  Self.FTR40SshClient.Password := Self.EditTR40Pass.Text;
+  Self.FDevice.TR40.SshClient.Port := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+  Self.FDevice.TR40.SshClient.User := Self.EditTR40User.Text;
+  Self.FDevice.TR40.SshClient.Password := Self.EditTR40Pass.Text;
 
   bmp := TBitmap.Create;
   OldCursor := Screen.Cursor;
@@ -672,7 +724,7 @@ begin
     Screen.Cursor := crHourGlass;
     try
       // try ping first
-      if not FTR40SshClient.TryPing(FTR40SshClient.HostIP) then
+      if not FDevice.TR40.SshClient.TryPing(FDevice.TR40.SshClient.HostIP) then
       begin
         ShowMessage('Can not ping to host');
         exit;
@@ -682,16 +734,15 @@ begin
       Self.IconList.GetBitmap(0, bmp);
       Self.ImageTR40ConnectLed.Picture.Assign(bmp);
 
-      FTR40SshClient.Connect;
-
-      if FTR40SshClient.IsConnected then
+      FDevice.TR40.SshClient.Connect;
+      if FDevice.TR40.SshClient.IsConnected then
       begin
-        FDeviceManager.TR40.IpAddress := Self.EditTR40HostIP.Text;
-        FDeviceManager.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
-        FDeviceManager.TR40.User := Self.EditTR40User.Text;
-        FDeviceManager.TR40.Password := Self.EditTR40Pass.Text;
+        FDevice.TR40.IpAddress := Self.EditTR40HostIP.Text;
+        FDevice.TR40.SshPort := StrToIntDef(Self.EditTR40SshPort.Text, 22);
+        FDevice.TR40.User := Self.EditTR40User.Text;
+        FDevice.TR40.Password := Self.EditTR40Pass.Text;
 
-        Self.FDeviceManager.SaveToFile;
+        Self.FDevice.SaveToFile;
 
         Self.ButtonTR40SshConnect.ImageIndex := 1;
         Self.IconList.GetBitmap(1, bmp);
@@ -726,7 +777,7 @@ begin
   // exit;
   // end;
 
-  Self.MemoIO40Output.Clear;
+  // Self.MemoIO40Output.Clear;
 
   // Self.FIO40SshClient.HostName := Self.EditIO40HostIP.Text;
   // Self.FIO40SshClient.Port := StrToIntDef(Self.EditIO40SshPort.Text, 22);
@@ -745,9 +796,9 @@ begin
       // exit;
       // end;
 
-      Self.ButtonIO40SshConnect.ImageIndex := 0;
-      Self.IconList.GetBitmap(0, bmp);
-      Self.ImageIO40ConnectLed.Picture.Assign(bmp);
+      // Self.ButtonIO40SshConnect.ImageIndex := 0;
+      // Self.IconList.GetBitmap(0, bmp);
+      // Self.ImageIO40ConnectLed.Picture.Assign(bmp);
 
       // FIO40SshClient.Connect;
 
@@ -879,7 +930,7 @@ begin
       end;
       MemoIO40State.Lines.Add('sending 123 bytes Ping');
       for i := Low(TxData) to High(TxData) - 1 do
-        TxData[i] := Random($FFFFFFFF); // fill Random Data
+        TxData[i] := Random($FFFFFF); // fill Random Data
       if IcmpSendEcho(hPing, ArpEntry.dwAddr, @TxData, PingLength, nil, @RxData, sizeof(RxData), 1000) > 0 then
       begin
         PECHO := Addr(RxData);
@@ -940,7 +991,7 @@ var
   bmp: TBitmap;
 begin
   newIP := Format('%s.%s.%s.%s', [EditIO40NewIPOctet1.Text, EditIO40NewIPOctet2.Text, EditIO40NewIPOctet3.Text, EditIO40NewIPOctet4.Text]);
-  if newIP = Self.FDeviceManager.IO40.IpAddress then
+  if newIP = Self.FDevice.IO40.IpAddress then
   begin
     ShowMessage('Please set new other IP address than the current.');
     exit;
@@ -1010,40 +1061,10 @@ end;
 
 procedure TMainForm.ButtonTR40InputClick(Sender: TObject);
 begin
-  if FTR40SshClient.DosCommand.IsRunning then
+  if FDevice.TR40.SshClient.DosCommand.IsRunning then
   begin
-    FTR40SshClient.DosCommand.SendLine(Self.EditTR40Input.Text, True);
+    FDevice.TR40.SshClient.DosCommand.SendLine(Self.EditTR40Input.Text, True);
   end;
-end;
-
-procedure TMainForm.ButtonTR40PingClick(Sender: TObject);
-var
-  OldCursor: TCursor;
-  CurrIP: string;
-  bmp: TBitmap;
-begin
-  OldCursor := Screen.Cursor;
-  Screen.Cursor := crHourGlass;
-
-  bmp := TBitmap.Create;
-  CurrIP := Format('%s.%s.%s.%s', [EditTR40CurrIPOctet1.Text, EditTR40CurrIPOctet2.Text, EditTR40CurrIPOctet3.Text, EditTR40CurrIPOctet4.Text]);
-  if Self.FTR40SshClient.TryPing(CurrIP) then
-  begin
-    Self.ButtonTR40Ping.ImageIndex := 1;
-    Self.IconList.GetBitmap(1, bmp);
-    Self.ImageTR40PingLed.Picture.Assign(bmp);
-  end
-  else
-  begin
-    Self.ButtonTR40Ping.ImageIndex := 0;
-    Self.IconList.GetBitmap(0, bmp);
-    Self.ImageTR40PingLed.Picture.Assign(bmp);
-  end;
-
-  bmp.Free;
-
-  Invalidate;
-  Screen.Cursor := OldCursor;
 end;
 
 procedure TMainForm.ButtonIO40PingClick(Sender: TObject);
@@ -1051,24 +1072,122 @@ var
   OldCursor: TCursor;
   CurrIP: string;
   bmp: TBitmap;
+  macAddr: string;
 begin
   OldCursor := Screen.Cursor;
   Screen.Cursor := crHourGlass;
 
   bmp := TBitmap.Create;
   CurrIP := Format('%s.%s.%s.%s', [EditIO40CurrIPOctet1.Text, EditIO40CurrIPOctet2.Text, EditIO40CurrIPOctet3.Text, EditIO40CurrIPOctet4.Text]);
-  // if Self.FIO40SshClient.TryPing(CurrIP) then
-  // begin
-  // Self.ButtonIO40Ping.ImageIndex := 1;
-  // Self.IconList.GetBitmap(1, bmp);
-  // Self.ImageIO40PingLed.Picture.Assign(bmp);
-  // end
-  // else
-  // begin
-  // Self.ButtonIO40Ping.ImageIndex := 0;
-  // Self.IconList.GetBitmap(0, bmp);
-  // Self.ImageIO40PingLed.Picture.Assign(bmp);
-  // end;
+
+  try
+    if Self.FDevice.IO40.TryPing(CurrIP) then
+    begin
+      Self.ButtonIO40Ping.ImageIndex := 1;
+      Self.IconList.GetBitmap(1, bmp);
+      Self.ImageIO40PingLed.Picture.Assign(bmp);
+
+      try
+        // get device type to confirm
+        if Self.FDevice.IO40.GetDevTypeViaModbus(CurrIP) = dtIO40 then
+        begin
+          Self.IconList.GetBitmap(1, bmp);
+          Self.ImageIsIO40.Picture.Assign(bmp);
+        end
+        else
+        begin
+          Self.IconList.GetBitmap(0, bmp);
+          Self.ImageIsIO40.Picture.Assign(bmp);
+
+          case Self.FDevice.IO40.GetDevTypeViaModbus(CurrIP) of
+            dtTR40:
+              ShowMessage('DevType: TR40');
+            dtNone:
+              ShowMessage('DevType: None');
+          end;
+        end;
+
+        macAddr := Self.FDevice.IO40.GetMacAddrViaModbus(CurrIP);
+        Self.EditIO40MacAddr.Text := macAddr;
+        Self.EditIO40Mac.Text := macAddr;
+      except
+        on E: Exception do
+        begin
+          ShowMessage(E.Message);
+
+          bmp.Free;
+          Screen.Cursor := OldCursor;
+          exit;
+        end;
+
+      end;
+
+    end
+    else
+    begin
+      Self.ButtonIO40Ping.ImageIndex := 0;
+      Self.IconList.GetBitmap(0, bmp);
+      Self.ImageIO40PingLed.Picture.Assign(bmp);
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage(E.Message);
+
+      bmp.Free;
+      Screen.Cursor := OldCursor;
+      exit;
+    end;
+
+  end;
+
+  bmp.Free;
+
+  Invalidate;
+  Screen.Cursor := OldCursor;
+
+end;
+
+procedure TMainForm.ButtonTR40PingClick(Sender: TObject);
+var
+  OldCursor: TCursor;
+  CurrIP: string;
+  bmp: TBitmap;
+  macAddr: string;
+begin
+  OldCursor := Screen.Cursor;
+  Screen.Cursor := crHourGlass;
+
+  bmp := TBitmap.Create;
+  CurrIP := Format('%s.%s.%s.%s', [EditTR40CurrIPOctet1.Text, EditTR40CurrIPOctet2.Text, EditTR40CurrIPOctet3.Text, EditTR40CurrIPOctet4.Text]);
+  if Self.FDevice.TR40.TryPing(CurrIP) then
+  begin
+    Self.ButtonTR40Ping.ImageIndex := 1;
+    Self.IconList.GetBitmap(1, bmp);
+    Self.ImageTR40PingLed.Picture.Assign(bmp);
+
+    // get device type to confirm
+    // if Self.FDevice.TR40.GetDevTypeViaModbus(CurrIP) = dtTR40 then
+    // begin
+    // Self.IconList.GetBitmap(1, bmp);
+    // Self.ImageIsTR40.Picture.Assign(bmp);
+    // end
+    // else
+    // begin
+    // Self.IconList.GetBitmap(0, bmp);
+    // Self.ImageIsTR40.Picture.Assign(bmp);
+    // end;
+    //
+    // macAddr := Self.FDevice.TR40.GetMacAddrViaModbus(CurrIP);
+    // Self.EditTR40MacAddr.Text := macAddr;
+
+  end
+  else
+  begin
+    Self.ButtonTR40Ping.ImageIndex := 0;
+    Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40PingLed.Picture.Assign(bmp);
+  end;
 
   bmp.Free;
 
@@ -1089,7 +1208,7 @@ var
   bmp: TBitmap;
 begin
   newIP := Format('%s.%s.%s.%s', [EditTR40NewIPOctet1.Text, EditTR40NewIPOctet2.Text, EditTR40NewIPOctet3.Text, EditTR40NewIPOctet4.Text]);
-  if newIP = Self.FDeviceManager.TR40.IpAddress then
+  if newIP = Self.FDevice.TR40.IpAddress then
   begin
     ShowMessage('Please set new other IP address than the current.');
     exit;
@@ -1104,21 +1223,21 @@ begin
 
   bmp := TBitmap.Create;
 
-  if Self.FTR40SshClient.IsConnected then
+  if Self.FDevice.TR40.SshClient.IsConnected then
   begin
 
-    if Self.FTR40SshClient.ChangeIP(newIP, newMask, newGate) then
+    if Self.FDevice.TR40.SshClient.ChangeIP(newIP, newMask, newGate) then
     begin
       // set set ip led on
       Self.ButtonTR40ChangeIP.ImageIndex := 1;
       Self.IconList.GetBitmap(1, bmp);
       Self.ImageTR40ChangeIPLed.Picture.Assign(bmp);
 
-      Self.FDeviceManager.TR40.IpAddress := newIP;
-      Self.FDeviceManager.TR40.SubnetMask := newMask;
-      Self.FDeviceManager.SaveToFile;
+      Self.FDevice.TR40.IpAddress := newIP;
+      Self.FDevice.TR40.SubnetMask := newMask;
+      Self.FDevice.SaveToFile;
 
-      Self.FTR40SshClient.IsConnected := false; // set to False on new IP
+      Self.FDevice.TR40.SshClient.IsConnected := false; // set to False on new IP
 
       // set ping led off
       Self.ButtonTR40Ping.ImageIndex := 0;
@@ -1163,15 +1282,15 @@ var
 begin
   //
   bmp := TBitmap.Create;
-  if Self.FTR40SshClient.IsConnected then
+  if Self.FDevice.TR40.SshClient.IsConnected then
   begin
-    Self.FTR40SshClient.DisConnect;
+    Self.FDevice.TR40.SshClient.DisConnect;
 
-    // Self.FTR40SshClient.IsConnected := false;
-    //
-    // Self.ButtonTR40SshConnect.ImageIndex := 0;
-    // Self.IconList.GetBitmap(0, bmp);
-    // Self.ImageTR40ConnectLed.Picture.Assign(bmp);
+    Self.FDevice.TR40.SshClient.IsConnected := false;
+
+    Self.ButtonTR40SshConnect.ImageIndex := 0;
+    Self.IconList.GetBitmap(0, bmp);
+    Self.ImageTR40ConnectLed.Picture.Assign(bmp);
   end;
   bmp.Free;
 end;
@@ -1179,16 +1298,16 @@ end;
 procedure TMainForm.EditIO40PassRightButtonClick(Sender: TObject);
 begin
   //
-  if Self.EditIO40Pass.RightButton.ImageIndex = 2 then
-  begin
-    Self.EditIO40Pass.PasswordChar := #0;
-    Self.EditIO40Pass.RightButton.ImageIndex := 3;
-  end
-  else if Self.EditIO40Pass.RightButton.ImageIndex = 3 then
-  begin
-    Self.EditIO40Pass.PasswordChar := '*';
-    Self.EditIO40Pass.RightButton.ImageIndex := 2;
-  end;
+  // if Self.EditIO40Pass.RightButton.ImageIndex = 2 then
+  // begin
+  // Self.EditIO40Pass.PasswordChar := #0;
+  // Self.EditIO40Pass.RightButton.ImageIndex := 3;
+  // end
+  // else if Self.EditIO40Pass.RightButton.ImageIndex = 3 then
+  // begin
+  // Self.EditIO40Pass.PasswordChar := '*';
+  // Self.EditIO40Pass.RightButton.ImageIndex := 2;
+  // end;
 end;
 
 procedure TMainForm.EditPasswordChange(Sender: TObject);
@@ -1241,6 +1360,26 @@ begin
   // Move the focus to the next octet after 3 characters are entered
   if Length(editBox.Text) >= 3 then
   begin
+    NextCtrl := editBox.Parent.ControlAtPos(Point(editBox.Left + editBox.Width + 10, editBox.Top), True, True, True);
+    if (NextCtrl <> nil) and (NextCtrl is TEdit) then
+      (NextCtrl as TEdit).SetFocus;
+  end;
+end;
+
+procedure TMainForm.OctetKeyPress(Sender: TObject; var Key: Char);
+var
+  NextCtrl: TControl;
+  editBox: TEdit;
+begin
+  editBox := TEdit(Sender);
+  if not Assigned(editBox) then
+    exit;
+
+  // Move the focus to the next octet after 3 characters are entered
+  if Key = '.' then
+  begin
+    Key := #0;
+
     NextCtrl := editBox.Parent.ControlAtPos(Point(editBox.Left + editBox.Width + 10, editBox.Top), True, True, True);
     if (NextCtrl <> nil) and (NextCtrl is TEdit) then
       (NextCtrl as TEdit).SetFocus;

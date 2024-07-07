@@ -1,42 +1,33 @@
 {===============================================================================
 
-The contents of this file are subject to the Mozilla Public License Version 1.1
-(the "License"); you may not use this file except in compliance with the
-License. You may obtain a copy of the License at http://www.mozilla.org/MPL/
+Copyright (c) 2010 P.L. Polak
 
-Software distributed under the License is distributed on an "AS IS" basis,
-WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
-the specific language governing rights and limitations under the License.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Alternatively, the contents of this file may be used under the terms of the
-GNU General Public License Version 2 or later (the "GPL"), in which case
-the provisions of the GPL are applicable instead of those above. If you wish to
-allow use of your version of this file only under the terms of the GPL and not
-to allow others to use your version of this file under the MPL, indicate your
-decision by deleting the provisions above and replace them with the notice and
-other provisions required by the GPL. If you do not delete the provisions
-above, a recipient may use your version of this file under either the MPL or
-the GPL.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-$Id: ModbusUtils.pas,v 1.9 2011/11/18 08:34:23 plpolak Exp $
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 
 ===============================================================================}
 
-
-
+{$I ModBusCompiler.inc}
 
 unit ModbusUtils;
 
 interface
-{$I ModBusCompiler.inc}
-{$IF CompilerVersion >= 24.0 }
-  {$LEGACYIFEND ON}
-{$IFEND}
-{$IF CompilerVersion >= 15.0 }
-{$WARN UNSAFE_TYPE OFF}
-{$WARN UNSAFE_CAST OFF}
-{$WARN UNSAFE_CODE OFF}
-{$IFEND}
 
 function BufferToHex(const Buffer: array of Byte): String;
 function CalculateCRC16(const Buffer: array of Byte): Word;
@@ -48,7 +39,6 @@ procedure GetCoilsFromBuffer(const Buffer: PByte; const Count: Word; var Data: a
 procedure PutCoilsIntoBuffer(const Buffer: PByte; const Count: Word; const Data: array of Word);
 
 procedure GetRegistersFromBuffer(const Buffer: PWord; const Count: Word; var Data: array of Word);
-procedure GetRegistersFromBufferRaw(const Buffer: PWord; const Count: Word; var Data: array of Word);
 procedure PutRegistersIntoBuffer(const Buffer: PWord; const Count: Word; const Data: array of Word);
 
 implementation
@@ -132,7 +122,7 @@ end;
 
 function Swap16(const DataToSwap: Word): Word;
 begin
-  Result := (DataToSwap div 256) + ((DataToSwap mod 256)*256);
+  Result := (DataToSwap div 256) + ((DataToSwap mod 256) * 256);
 end;
 
 
@@ -142,6 +132,9 @@ var
   BitMask: Byte;
   i: Integer;
 begin
+  if (Length(Data) < ((Count div 16) - 1)) or (Length(Data) = 0) or (Count = 0) then
+    raise Exception.Create('GetCoilsFromBuffer: Data array length cannot be less then Count');
+
   BytePtr := Buffer;
   BitMask := 1;
 
@@ -171,6 +164,9 @@ var
   BitMask: Byte;
   i: Word;
 begin
+  if (Length(Data) < ((Count div 16) - 1)) or (Length(Data) = 0) or (Count = 0) then
+    raise Exception.Create('PutCoilsIntoBuffer: Data array length cannot be less then Count');
+
   BytePtr := Buffer;
   BitMask := 1;
   for i := 0 to (Count - 1) do
@@ -195,37 +191,29 @@ end;
 
 procedure GetRegistersFromBuffer(const Buffer: PWord; const Count: Word; var Data: array of Word);
 var
-  WPtr: PWord;
+  WordPtr: PWord;
   i: Word;
 begin
-  WPtr := Buffer;
+  if (Length(Data) < (Count - 1)) or (Length(Data) = 0) or (Count = 0) then
+    raise Exception.Create('GetRegistersFromBuffer: Data array length cannot be less then Count');
 
+  WordPtr := Buffer;
   for i := 0 to (Count - 1) do
   begin
-    Data[i] := Swap16(WPtr^);
-    Inc(WPtr);
+    Data[i] := Swap16(WordPtr^);
+    Inc(WordPtr);
   end;
 end;
 
-procedure GetRegistersFromBufferRaw(const Buffer: PWord; const Count: Word; var Data: array of Word);
-var
-  WPtr: PWord;
-  i: Word;
-begin
-  WPtr := Buffer;
-
-  for i := 0 to (Count - 1) do
-  begin
-    Data[i] := Word(WPtr^);
-    Inc(WPtr);
-  end;
-end;
 
 procedure PutRegistersIntoBuffer(const Buffer: PWord; const Count: Word; const Data: array of Word);
 var
   WordPtr: PWord;
   i: Word;
 begin
+  if (Length(Data) < (Count - 1)) or (Length(Data) = 0) or (Count = 0) then
+    raise Exception.Create('PutRegistersIntoBuffer: Data array length cannot be less then Count');
+
   WordPtr := Buffer;
   for i := 0 to (Count - 1) do
   begin

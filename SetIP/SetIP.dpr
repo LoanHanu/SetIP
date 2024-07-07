@@ -6,6 +6,12 @@ program SetIP;
 
 
 
+
+
+
+
+
+
 uses
   Vcl.Forms,
   uMainForm in 'uMainForm.pas' {MainForm},
@@ -19,11 +25,12 @@ uses
   SocketUtils in 'Service\libssh2\SocketUtils.pas',
   uLibSsh2Client in 'Service\uLibSsh2Client.pas',
   Winsock2 in 'Service\winsock2\Winsock2.pas',
+  libssh2 in 'Service\libssh2\libssh2.pas',
+  logger in 'Service\Logger\logger.pas',
   IdModbusClient in 'Service\Modbus\IdModbusClient.pas',
   ModBusConsts in 'Service\Modbus\ModBusConsts.pas',
   ModbusTypes in 'Service\Modbus\ModbusTypes.pas',
-  ModbusUtils in 'Service\Modbus\ModbusUtils.pas',
-  libssh2 in 'Service\libssh2\libssh2.pas';
+  ModbusUtils in 'Service\Modbus\ModbusUtils.pas';
 
 {$R *.res}
 

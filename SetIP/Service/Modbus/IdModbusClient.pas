@@ -1,41 +1,32 @@
 {===============================================================================
 
-The contents of this file are subject to the Mozilla Public License Version 1.1
-(the "License"); you may not use this file except in compliance with the
-License. You may obtain a copy of the License at http://www.mozilla.org/MPL/
+Copyright (c) 2010 P.L. Polak
 
-Software distributed under the License is distributed on an "AS IS" basis,
-WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
-the specific language governing rights and limitations under the License.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Alternatively, the contents of this file may be used under the terms of the
-GNU General Public License Version 2 or later (the "GPL"), in which case
-the provisions of the GPL are applicable instead of those above. If you wish to
-allow use of your version of this file only under the terms of the GPL and not
-to allow others to use your version of this file under the MPL, indicate your
-decision by deleting the provisions above and replace them with the notice and
-other provisions required by the GPL. If you do not delete the provisions
-above, a recipient may use your version of this file under either the MPL or
-the GPL.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-$Id: IdModbusClient.pas,v 1.34 2014/01/14 15:21:20 plpolak Exp $
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ===============================================================================}
 
-
+{$I ModBusCompiler.inc}
 
 unit IdModBusClient;
 
 interface
-{$I ModBusCompiler.inc}
-{$IF CompilerVersion >= 24.0 }
-  {$LEGACYIFEND ON}
-{$IFEND}
-{$IF CompilerVersion >= 15.0 }
-{$WARN UNSAFE_TYPE OFF}
-{$WARN UNSAFE_CAST OFF}
-{$WARN UNSAFE_CODE OFF}
-{$IFEND}
 
 uses
   Classes
@@ -48,9 +39,6 @@ uses
  ,IdGlobal
  ,IdTCPClient;
 
-
-
-     
 type
   TModBusClientErrorEvent = procedure(const FunctionCode: Byte;
     const ErrorCode: Byte; const ResponseBuffer: TModBusResponseBuffer) of object;
@@ -58,18 +46,7 @@ type
     const ResponseFunctionCode: Byte; const ResponseBuffer: TModBusResponseBuffer) of object;
 
 type
-{$IFDEF DMB_DELPHIXE3}
-  {$WARN SYMBOL_DEPRECATED OFF}
-  [ComponentPlatformsAttribute(pidWin32 or pidWin64 or
-                               pidLinux32 or
-  {$IFDEF DMB_DELPHIXE5}
-                               pidAndroid or
-  {$ENDIF}
-  {$IFDEF DMB_DELPHIXE4}
-                               pidiOSDevice or pidiOSSimulator or
-  {$ENDIF}
-                               pidOSX32)]
-{$ENDIF}
+{$I ModBusPlatforms.inc}
   TIdModBusClient = class(TIdTCPClient)
   private
     FAutoConnect: Boolean;
@@ -112,7 +89,6 @@ type
     function ReadDouble(const RegNo: Word; out Value: Double): Boolean;
     function ReadDWord(const RegNo: Word; out Value: DWord): Boolean;
     function ReadHoldingRegister(const RegNo: Word; out Value: Word): Boolean;
-    function ReadManyRegisters(const RegNo: Word; const Blocks: Word; out RegisterData: array of Word): Boolean;
     function ReadHoldingRegisters(const RegNo: Word; const Blocks: Word; out RegisterData: array of Word): Boolean;
     function ReadInputBits(const RegNo: Word; const Blocks: Word; out RegisterData: array of Boolean): Boolean;
     function ReadInputRegister(const RegNo: Word; out Value: Word): Boolean;
@@ -122,8 +98,7 @@ type
     function WriteCoil(const RegNo: Word; const Value: Boolean): Boolean;
     function WriteCoils(const RegNo: Word; const Blocks: Word; const RegisterData: array of Boolean): Boolean;
     function WriteRegister(const RegNo: Word; const Value: Word): Boolean;
-    function WriteRegisters(const RegNo: Word; const RegisterData: array of Word): Boolean; overload;
-    function WriteRegisters(const aRegNo: Word; const aBlocks: Word; const aRegisterData: array of Word): Boolean; overload;
+    function WriteRegisters(const RegNo: Word; const RegisterData: array of Word): Boolean;
     function WriteDouble(const RegNo: Word; const Value: Double): Boolean;
     function WriteDWord(const RegNo: Word; const Value: DWord): Boolean;
     function WriteSingle(const RegNo: Word; const Value: Single): Boolean;
@@ -234,8 +209,8 @@ begin
       begin
         BlockLength := ABlockLength;
       { Don't exceed max length }
-        if (BlockLength > 250) then
-          BlockLength := 250;
+        if (BlockLength > 2000) then
+          BlockLength := 2000;
       { Initialise the data part }
         SendBuffer.FunctionCode := Byte(AModBusFunction); { Write appropriate function code }
         SendBuffer.Header.UnitID := FUnitID;
@@ -251,18 +226,6 @@ begin
         BlockLength := ABlockLength;
         if (BlockLength > 125) then
           BlockLength := 125; { Don't exceed max length }
-      { Initialise the data part }
-        SendBuffer.FunctionCode := Byte(AModBusFunction); { Write appropriate function code }
-        SendBuffer.Header.UnitID := FUnitID;
-        SendBuffer.MBPData[0] := Hi(RegNumber);
-        SendBuffer.MBPData[1] := Lo(RegNumber);
-        SendBuffer.MBPData[2] := Hi(BlockLength);
-        SendBuffer.MBPData[3] := Lo(BlockLength);
-        SendBuffer.Header.RecLength := Swap16(6); { This includes UnitID/FuntionCode }
-      end;
-    mbfReadManyRegs:
-      begin
-        BlockLength := ABlockLength;
       { Initialise the data part }
         SendBuffer.FunctionCode := Byte(AModBusFunction); { Write appropriate function code }
         SendBuffer.Header.UnitID := FUnitID;
@@ -301,8 +264,8 @@ begin
       begin
         BlockLength := ABlockLength;
       { Don't exceed max length }
-        if (BlockLength > 250) then
-          BlockLength := 250;
+        if (BlockLength > 1968) then
+          BlockLength := 1968;
       { Initialise the data part }
         SendBuffer.FunctionCode := Byte(AModBusFunction); { Write appropriate function code }
         SendBuffer.Header.UnitID := FUnitID;
@@ -318,8 +281,8 @@ begin
       begin
         BlockLength := ABlockLength;
       { Don't exceed max length }
-        if (BlockLength > 250) then
-          BlockLength := 250;
+        if (BlockLength > 120) then
+          BlockLength := 120;
       { Initialise the data part }
         SendBuffer.FunctionCode := Byte(AModBusFunction); { Write appropriate function code }
         SendBuffer.Header.UnitID := FUnitID;
@@ -380,8 +343,8 @@ begin
       mbfReadInputBits:
         begin
           BlockLength := ReceiveBuffer.MBPData[0] * 8;
-          if (BlockLength > 250) then
-            BlockLength := 250;
+          if (BlockLength > 2000) then
+            BlockLength := 2000;
           GetCoilsFromBuffer(@ReceiveBuffer.MBPData[1], BlockLength, Data);
         end;
       mbfReadHoldingRegs,
@@ -391,13 +354,6 @@ begin
           if (BlockLength > 125) then
             BlockLength := 125;
           GetRegistersFromBuffer(@ReceiveBuffer.MBPData[1], BlockLength, Data);
-        end;
-      mbfReadManyRegs:
-        begin
-          BlockLength := (ReceiveBuffer.MBPData[0] shl 8) + (ReceiveBuffer.MBPData[1]);
-          if ABlockLength=BlockLength then
-          Move(ReceiveBuffer.MBPData[2],Data,2*BlockLength);
-          //GetRegistersFromBufferRaw(@ReceiveBuffer.MBPData[2], BlockLength, Data);
         end;
     end;
   end
@@ -462,35 +418,6 @@ begin
   end;
 end;
 
-function TIdModBusClient.ReadManyRegisters(const RegNo, Blocks: Word;
-  out RegisterData: array of Word): Boolean;
-var
-  i: Integer;
-  Data: array of Word;
-  bNewConnection: Boolean;
-begin
-  bNewConnection := False;
-  if FAutoConnect and not Connected then
-  begin
-  {$IFDEF DMB_INDY10}
-    Connect;
-  {$ELSE}
-    Connect(FConnectTimeOut);
-  {$ENDIF}
-    bNewConnection := True;
-  end;
-
-  try
-    SetLength(Data, Blocks);
-    FillChar(Data[0], Length(Data), 0);
-    Result := SendCommand(mbfReadManyRegs, RegNo, Blocks, Data);
-    for i := Low(Data) to High(Data) do
-      RegisterData[i] := Data[i];
-  finally
-    if bNewConnection then
-      DisConnect;
-  end;
-end;
 
 function TIdModBusClient.ReadInputBits(const RegNo, Blocks: Word;
   out RegisterData: array of Boolean): Boolean;
@@ -777,41 +704,6 @@ begin
       Data[i] := RegisterData[i];
     Result := SendCommand(mbfWriteRegs, RegNo, iBlockLength, Data);
   finally
-    if bNewConnection then
-      DisConnect;
-  end;
-end;     
-
-
-function TIdModBusClient.WriteRegisters(const aRegNo: Word;
-  const aBlocks: Word;
-  const aRegisterData: array of Word): Boolean;
-var
-  i: Integer;
-  iBlockLength: Integer;
-  Data: array of Word;
-  bNewConnection: Boolean;
-begin
-  bNewConnection := False;
-  iBlockLength := Length(aRegisterData);
-  if (aBlocks < iBlockLength) then iBlockLength := aBlocks;
-  if FAutoConnect and not Connected then
-  begin
-  {$IFDEF DMB_INDY10}
-    Connect;
-  {$ELSE}
-    Connect(FConnectTimeOut);
-  {$ENDIF}
-    bNewConnection := True;
-  end;
-
-  try
-    SetLength(Data, iBlockLength);
-    for i := Low(Data) to High(Data) do
-      Data[i] := aRegisterData[i];
-    Result := SendCommand(mbfWriteRegs, aRegNo, iBlockLength, Data);
-  finally                                                          
-    SetLength(Data, 0);
     if bNewConnection then
       DisConnect;
   end;

@@ -1,5 +1,14 @@
-unit commThreadIS1885L;
-{ Zero-based indexation of AI, DI, AO, DO. This way it was all tested. }
+﻿unit commThreadIS1885L;
+(* Communication with soft controlled IS1885L device in style of standard CommLib library
+   @note Zero-based indexation of AI, DI, AO, DO. This way it was all tested.
+
+  @updated 2023-06-06 Wolfgang Lang  - Added status Discharge to discharge to certain voltage with timeout.
+  @updated 2022-05-11 Tomáš Koloušek - included suggestions from BMW project by MK
+  @updated 2021-12-09 Tomáš Koloušek - fixes for ocassional NAN MeasR within process image leading to background thread crash
+  @updated 2021-11-12 Tomáš Koloušek - U,I and R directly read from IS process image on 0x2020-0x2027, no avg, hardcoded
+  @created 2021-07-23 Radek Pyšný - initial implementation, design and debugging
+*)
+
 
 {$define EXTERNAL_PROCEDURES} // last testing done with this enabled
 {$define RAMP_UP}
@@ -8,7 +17,7 @@ unit commThreadIS1885L;
   {$define STANDALONE_IO40}
 {$endif}
 
-//{$define SERVICE}
+{$define SERVICE}
 //{$define STANDALONE_IO40}
 //{$define MIN_MAX}
 
@@ -16,7 +25,7 @@ INTERFACE
 
 uses
   IdBaseComponent, IdComponent, IdTCPConnection, IdTCPClient, IdModBusClient, ModbusTypes,
-  Classes, SyncObjs;
+  Classes, SyncObjs,Windows;
 
 
 const
@@ -38,7 +47,7 @@ const
   cPowerSupplyVoltageMin    = 15.0;
   cPowerSupplyVoltageMax    = 24.0;
 
-  cParTestTimeLimitMin      = 1.0;
+  cParTestTimeLimitMin      = 0.25;   // 1.0;
   cParTestTimeLimitMax      = 999.9;
   cParTestTimeDefault       = 5.0;
 
@@ -97,9 +106,10 @@ const
     0x4CC1 = 0b | 01001 100 | 11 000001 |
                 | XXXXX YYY | YY ZZZZZZ | (where ZZZZZZ is counter of IS devices :)
   }
-  cDefaultIdIO40IS1885L     = $4CC1;
+  cVariant1IdIO40IS1885L    = $4CC1;
+  cDefaultIdIO40IS1885L     = $4953;  // 'IS'
 
-  { Error codes ans status codes }
+  { Error codes and status codes }
   OK                        = 0;
   ErrorGeneral              = -1;
   ErrorDisconnected         = -2;
@@ -130,6 +140,7 @@ const
   ErrorNotYetPreparedTest   = -27;
   ErrorNoOptUsense          = -28;
   ErrorInvalidTestParamRng  = -29;
+  ErrorMBWatchdog           = -30;
 
   StatNoActionYet           = 1;
 
@@ -197,6 +208,21 @@ const
   AddrSpec_Cal_Data         = $4001;  // Start Register for Calibration Data.
   AddrSpec_Cal_Data_Max     = $4041;  // End Register for Calibration Data,64 registers.
 
+  AddrSpec_ActualMeas_min   = $2020;  // actual measurement,taken directly from IS with calibration already taken in effect
+  AddrSpec_ActualU          = $2020;  // actual voltage, 32bit float ($2020+$2021)
+  AddrSpec_ActualI          = $2022;
+  AddrSpec_ActualR          = $2024;
+  AddrSpec_ActualUsense     = $2026;
+  AddrSpec_ActualMeas_max   = $2027;
+
+  AddrSpec_SysTypVer        = $0200;
+  AddrSpec_UniqueID_first   = $0201;
+  AddrSpec_UniqueID_last    = $0208;
+  AddrSpec_HWVer            = $0209;
+  AddrSpec_SWVer            = $020A;
+  AddrSpec_SWBuildNr        = $020B;
+  AddrSpec_SysStatus        = $020C;
+
 
   { Digital inputs - used }
   DigIn_Option_USense       = 0;
@@ -244,9 +270,23 @@ const
   { Window for resistance averaging }
   cAvgResWinSizeMin         = 1;
   cAvgResWinSizeMax         = 10;
+  cAvgResWinSizeDef         = cAvgResWinSizeMin;
   cAvgResDelayMin           = 0;
   cAvgResDelayMax           = 10;
+  cAvgResDelayDef           = cAvgResDelayMin;
 
+   //we use constant as Single, so we can make direct compare.
+   DefUNomRange = 6000;
+   DefURealRange = 6000;
+   DefIRealRange = 0.01;
+   DefI1uARange = 0.000001;
+   DefI100uARange = 0.0001;
+   DefI10mARange = 0.01;
+   DefURange = 6000;
+   DefUsenseRange = 6000;
+  { Discharge Parameter }
+  cDischargeTimeoutDef    = 2000;
+  cDischargeVoltageDef    = 25;
 
 { Originally hidden (in implementations ection) 3 data types - moved here to enable debugging in service tool. }
 { (TIRange enum and TTestPhase enum and TTestStatus record) }
@@ -262,6 +302,7 @@ type
                , tpRampUp
                , tpTest
                , tpRampDown
+               , tpDischarging
                , tpFinishing
                );
 
@@ -269,6 +310,7 @@ type
   TTestStatus = record
     ReadyToStart:     Boolean;
     Finishing:        Boolean;
+    Discharging:      Boolean;
     Finished:         Boolean;
     ErrorCode:        Integer;
     ElapsedTime:      LongWord;   //  [ms]
@@ -362,11 +404,38 @@ type
                       , HG40UOff
                       , UsenseFact
                       , UsenseOff
+                      , ReserveFact2
+                      , ReserveOff2
+                      , TR40ch1Fact
+                      , TR40ch1Off
+                      , TR40ch2Fact
+                      , TR40ch2Off
+                      , TR40ch3Fact
+                      , TR40ch3Off
+                      , TR40ch4Fact
+                      , TR40ch4Off
+                      //16-41 free
+                      , BKUNomRange = 42
+                      , BKURealRange
+                      , BKIRealRange
+                      , HG40I1uARange
+                      , HG40I100uARange
+                      , HG40I10mARange
+                      , HG40URange
+                      , UsenseRange
+                      , Reserve1Range
+                      , Reserve2Range
+                      , TR40ch1Range
+                      , TR40ch2Range
+                      , TR40ch3Range
+                      , TR40ch4Range
+                      //49-62 free
+                      , CalibrationDate=63
                       );
   TCalibrationParams = set of TCalibrationParam;
 
 {$ifdef SERVICE}
-  TUpdateMeas = procedure (aTotRemTime, RemainTime, aUgen, aUreal, aI_Rreal: Double; aGlobStat: Byte; aErrCode: Integer; aOL, aFinished: Boolean) of object;
+  TUpdateMeas = procedure (aTotRemTime, RemainTime, aUgen, aUreal, aIreal, aRreal: Double; aGlobStat: Byte; aErrCode: Integer; aOL, aFinished, aSPO: Boolean) of object;
   TUpdateAll  = procedure (aRec: Pointer) of object;
 {$endif}
 
@@ -382,8 +451,13 @@ type
       fCouplerID:   AnsiString;
       f24V:         Double;
       fInstOpts:    TInstalledOptions;
+      fUniqueID:    AnsiString;
+      fSysTypVer:   AnsiString;
+      fHWVer:       AnsiString;
+      fSWVer:       AnsiString;
 
       fInitOk:      Boolean;
+      fUseActualMeasImage: Boolean;   // use actual measurement image directly from IS on $2020- instead of in code wunning window averaging
 
 {$ifdef SERVICE}
       fOnUpdate:    TUpdateMeas;
@@ -400,8 +474,12 @@ type
       fErrCode:     Integer;
       fOL:          Boolean;
       fFinished:    Boolean;
+      fSPO:         Boolean;
 
       fCalibrationData: array [0 .. 63] of Double;
+      fCalibrationDate:Word;
+      fCalibrationTime:Word;
+      Function GetConnected:Boolean;
 
     public
       constructor create;
@@ -445,23 +523,26 @@ type
 
       function devInit (aWatchdogTime: Word = 0): TRetVal;
       function devTestStop: TRetVal;
+      function devTestOff: TRetVal; //switch off generator
       function devTestStart_I6: TRetVal;
       function devTestPrep_I6 (aTestTime, aRampTime, aUstart, aUnom, aRmin, aDetectDelay: Double; aRampDown, aInverted, a4wire: Boolean;
-          aAvgResWinSize: Integer = cAvgResWinSizeMax; aAvgResDelay: Integer = cAvgResDelayMax): TRetVal;
-      function devTestGet_I6 (var aTotalRemTime, aRemTime, aUgen, aUreal, aRreal: Double; var aErrCode: Integer; var aGlobStat: Byte; var aOL, aFinished: Boolean): TRetVal;
+          aAvgResWinSize: Integer = cAvgResWinSizeMax; aAvgResDelay: Integer = cAvgResDelayMax;aDischargeTimeout: Integer=cDischargeTimeoutDef; aDischargeVoltage: Integer=cDischargeVoltageDef): TRetVal;
+      function devTestGet_I6 (var aTotalRemTime, aRemTime, aUgen, aUreal, aIreal, aRreal: Double; var aErrCode: Integer; var aGlobStat: Byte; var aOL, aFinished, aSPO: Boolean): TRetVal;
       function devTestStart_H6: TRetVal;
-      function devTestPrep_H6 (aTestTime, aRampTime, aUstart, aUnom, aImin, aImax: Double; aRampDown, aInverted, a4wire: Boolean): TRetVal;
-      function devTestGet_H6 (var aTotalRemTime, aRemTime, aUgen, aUreal, aIreal: Double; var aErrCode: Integer; var aGlobStat: Byte;var aFinished: Boolean): TRetVal;
+      function devTestPrep_H6 (aTestTime, aRampTime, aUstart, aUnom, aImin, aImax: Double; aRampDown, aInverted, a4wire: Boolean; aDischargeTimeout:Integer=cDischargeTimeoutDef; aDischargeVoltage:Integer=cDischargeVoltageDef): TRetVal;
+      function devTestGet_H6 (var aTotalRemTime, aRemTime, aUgen, aUreal, aIreal: Double; var aErrCode: Integer; var aGlobStat: Byte; var aFinished, aSPO: Boolean): TRetVal;
 
       { Functions for calibration}
       procedure clearAllCalibData;
       function  readAllCalibData (aContinueOnError: Boolean = true): TRetVal;
-      procedure passAllCalibData; 
+      procedure passAllCalibData;
       function  getCalibValue (ValIndex: TCalibrationParam): Double;
       procedure setCalibValue (ValIndex: TCalibrationParam; Value: Double);
       function  writeCalibValue (ValIndex: TCalibrationParam; Value: Double): TRetVal;
       function  readCalibValue (ValIndex: TCalibrationParam; var Value: Single): TRetVal;
-
+      function  writeCalibTime(Time:TSystemTime):TRetVal;
+      function  readCalibTime(var Time:TSystemTime):TRetVal;
+      function  getCalibTime:TSystemTime;
     public
       class function showRetVal (const aCode: TRetVal; const aDescription: Boolean = false): AnsiString;
       class function calcRrange (const aUnom: Double): Double;
@@ -472,11 +553,18 @@ type
     public
       property initOk: Boolean read fInitOk;
       property installedOptions: TInstalledOptions read fInstOpts;
-{$ifdef SERVICE}
-      property onUpdate: TUpdateMeas write fOnUpdate { write only ! };
-      property onUpdateAll: TUpdateAll write fOnUpdateAll { write only ! };
-{$endif}
+      property IO40ID: Word read fIO40ID;
+      property couplerID: ANsiString read fCouplerID;
+      property uniqueID: AnsiString read fUniqueID;
+      property systemTypeVersion: AnsiString read fSysTypVer;
+      property hardwareVersion: AnsiString read fHWVer;
+      property softwareVersion: AnsiString read fSWVer;
 
+{$ifdef SERVICE}
+      property onUpdate: TUpdateMeas read fOnUpdate write fOnUpdate;
+      property onUpdateAll: TUpdateAll read fOnUpdateAll write fOnUpdateAll;
+{$endif}
+      property isConnected: Boolean read GetConnected;
     protected
       function checkPrologue (aConnected: Boolean = true): TRetVal;
       procedure hndlUpdate_I6 (aThread: TThread);
@@ -498,7 +586,7 @@ uses
 {$ifndef SERVICE}
   CommLibH,
 {$endif}
-  MMSystem, Windows, Forms, SysUtils, SynaIP, Math;
+  MMSystem, {Windows,} Forms, SysUtils, SynaIP, Math, JclDebug, Logger;
 
 
 const
@@ -520,7 +608,7 @@ const
   cScale24bWriteMult: Double      = 8388607.0;  // 0x7FFFFF (23b)
   { *ReadMult: factor for conversion from digital value (Word or LongWord) to analog value (Double) }
   cUrangeReadMult: Double         = 6000.0;     // 0-6 kV
-  cIrangeReadMult_10mA: Double    = 1e-2;       // 0-10 mA 
+  cIrangeReadMult_10mA: Double    = 1e-2;       // 0-10 mA
   cIrangeReadMult_100uA: Double   = 1e-4;       // 0-0.1 mA (0-100 uA)
   cIrangeReadMult_1uA: Double     = 1e-6;       // 0-1 uA
   cScale16bReadMult: Double       = 3.0518509476e-5;
@@ -546,6 +634,7 @@ const
   STA_TEST_RAMP_UP              = $30;
   STA_TEST_RAMP_DOWN            = $50;
   STA_TEST_MEASURING            = $60;
+  STA_TEST_DISCHARGE            = $70;
   STA_TEST_FINISHED             = $80;
 {$endif} 
 
@@ -555,6 +644,7 @@ const
     , { tpRampUp    } STA_TEST_RAMP_UP
     , { tpTest      } STA_TEST_MEASURING
     , { tpRampDown  } STA_TEST_RAMP_DOWN
+    , { tpDischarging} STA_TEST_DISCHARGE
     , { tpFinishing } STA_TEST_FINISHED
     );
 
@@ -581,6 +671,7 @@ type
             , actTestStop
             , actTestPrep
             , actTestStart
+            , actTestOff
             );
 
 
@@ -617,20 +708,22 @@ type
 
 
   TTestParams_I6 = record
-    TestTime:       Double;
-    RampTime:       Double;
-    Ustart:         Double;
-    Unom:           Double;
-    Rmin:           Double;
-    Rrange:         Double;
-    DetectDelay:    Double;
-    RampDown:       Boolean;
-    Inverted:       Boolean;
-    Usense:         Boolean;
+    TestTime:     Double;
+    RampTime:     Double;
+    Ustart:       Double;
+    Unom:         Double;
+    Rmin:         Double;
+    Rrange:       Double;
+    DetectDelay:  Double;
+    RampDown:     Boolean;
+    Inverted:     Boolean;
+    Usense:       Boolean;
     AvgResWinSize:  Integer;
     AvgResDelay:    Integer;
-  end;           
-                 
+    DischargeTimeout: Integer;
+    DischargeVoltage: Integer;
+  end;
+
 
   TTestParams_H6 = record
     TestTime:     Double;
@@ -642,6 +735,8 @@ type
     RampDown:     Boolean;
     Inverted:     Boolean;
     Usense:       Boolean;
+    DischargeTimeout: Integer;
+    DischargeVoltage: Integer;
   end;
 
 
@@ -690,6 +785,8 @@ type
       fTimeRampUpEnd:     LongWord;
       fTimeRampDnStart:   LongWord;
       fTimeTestEnd:       LongWord;
+      fTimeDischargeEnd:  LongWord;
+      fTimeDischargeStart:LongWord;
       fTimeDetectStart:   LongWord;
       fTimeUminCheck:     LongWord;
       fTestStatus:        array [TTestKind] of TTestStatus;
@@ -707,6 +804,9 @@ type
       fInputImage:        array [AddrRng_InImg_Min .. AddrRng_InImg_Max] of Word;
       fTempInputImage:    array [AddrRng_InImg_Min .. AddrRng_InImg_Max] of Word;
 
+      fActualMeasImage:   array [AddrSpec_ActualMeas_min .. AddrSpec_ActualMeas_max] of Word;    // actual measurement, computed and corrected to calibration by IS
+      fTempActualMeasImage: array [AddrSpec_ActualMeas_min .. AddrSpec_ActualMeas_max] of Word;
+
       fDigOutImage:       array [DigOut_min .. DigOut_max] of Boolean;
 
       fTempRegLength:     Byte;
@@ -721,6 +821,7 @@ type
 
       fCalibOffset:       array [TCalibBasicItem] of Double;
       fCalibFactor:       array [TCalibBasicItem] of Double;
+      fCalibRange:       array [TCalibBasicItem] of Double;
 
     public
       constructor create (const aCSInputImg, aCSTestStat: TCriticalSection; const aOnUpdI6, aOnUpdH6: TThreadStatusUpdateEvent; const aUpdateInterval: Word);
@@ -730,7 +831,7 @@ type
 
     private
       procedure doAction (const aAction: TAction);
-      procedure doProcessReading (const aTestKind: TTestKind);
+      procedure doProcessReading (const aTestKind: TTestKind;const useActualMeasImage:boolean);
       procedure doUpdateStatus (const aTestKind: TTestKind);
 
       procedure clearStatusRec (var aRec: TTestStatus);
@@ -771,6 +872,15 @@ type
       property isConnected: Boolean read fConnected;
   end;
 
+{ Helper function, sonvert single 32bit value into 32bit float value, as used in internal process image }
+function dw2single(const w0, w1: Word): single;
+var value:single;
+begin
+  LongRec(value).Lo := w0;
+  LongRec(value).Hi := w1;
+  Result := value;
+end;
+
 
 { Helper function to reduce code redundancy (cannot be method due to visibility control). }
 { Parameter aData is used as both input and output parameter. }
@@ -788,20 +898,24 @@ begin
 
   try
     { REQUEST }
+    log.event(STACK_LEVEL, 'send request - %d', [ord(aAction)], Logger.logLevel_Debug);
     result := TCommThreadIS1885L(aThread).request(aAction, aAddr, aData, aRegNr);
     if (result <> OK) then exit;
 
     { RESPONSE }
+    log.event(STACK_LEVEL, 'read response', Logger.logLevel_Verbose);
     result := TCommThreadIS1885L(aThread).waitForResponse(aAction, rv, w, aTout);
     if (result <> OK) then exit;
 
     { ACK }
+    log.event(STACK_LEVEL, 'send ACK', Logger.logLevel_Verbose);
     result := TCommThreadIS1885L(aThread).ack(aAction);
     if (result <> OK) then exit;
 
   finally
     if (result <> OK) then
     begin { NAK }
+      log.event(STACK_LEVEL, 'ERROR! send NAK', Logger.logLevel_Error);
       TCommThreadIS1885L(aThread).ack(aAction);
     end
     else
@@ -861,6 +975,11 @@ begin
   self.f24V := 0.0;
   self.fInstOpts := [];
   self.fInitOk := false;
+  self.fUniqueID := '';
+  self.fSysTypVer := '';
+  self.fHWVer := '';
+  self.fSWVer := '';
+  self.fUseActualMeasImage := false;
 
 {$ifdef SERVICE}
   self.fOnUpdate := nil;
@@ -879,6 +998,7 @@ begin
   self.fErrCode := 0;
   self.fOL := false;
   self.fFinished := false;
+  self.fSPO := false;
 end;
 
 
@@ -1304,8 +1424,10 @@ var
 {$endif}
   b:  Boolean;
   x:  Double;
-  a:  array [0 .. 6] of Word;
+  a:  array [0 .. 12] of Word;
+  n:  Byte;
   w:  Word;
+  s:  AnsiString;
 
 begin
   self.fIO40ID := 0;
@@ -1313,7 +1435,12 @@ begin
   self.f24V := 0.0;
   self.fInstOpts := [];
   self.fInitOk := false;
+  self.fUniqueID := '';
+  self.fSysTypVer := '';
+  self.fHWVer := '';
+  self.fSWVer := '';
 
+  log.event(STACK_LEVEL, 'soft reset call', Logger.logLevel_Debug);
   TCommThreadIS1885L(self.fThread).softReset;
 
   result := self.checkPrologue;
@@ -1323,7 +1450,9 @@ begin
   sleep(10);
 
   { Read out ID of IO40 (will be set external, not with DAT) }
-  result := self.readMulti_raw(AddrSpec_CouplerID_first, Length(a), a);
+  log.event(STACK_LEVEL, 'read out ID of IO40 (will be set external, not with DAT', Logger.logLevel_Debug);
+  n := AddrSpec_CouplerID_last - AddrSpec_CouplerID_first + 2;
+  result := self.readMulti_raw(AddrSpec_CouplerID_first, n, a);
   if (result <> OK) then exit;
 
   SetLength(self.fCouplerID, 12);
@@ -1331,25 +1460,34 @@ begin
   begin
     ii := (i shl 1) + 1;
 
-    self.fCouplerID[ii    ] := Chr(WordRec(a[i]).Lo);
-    self.fCouplerID[ii + 1] := Chr(WordRec(a[i]).Hi);
+    self.fCouplerID[ii    ] := AnsiChar(WordRec(a[i]).Lo);
+    self.fCouplerID[ii + 1] := AnsiChar(WordRec(a[i]).Hi);
   end;
   self.fIO40ID := a[6];
 
-  if ( (self.fCouplerID <> 'BK90IO40V.00') or (self.fIO40ID <> cDefaultIdIO40IS1885L) ) then
+  if ( (Copy(self.fCouplerID, 1, 10) <> 'BK90IO40V.') or (StrToIntDef(Copy(self.fCouplerID, 11, 2), -1) < 0) ) then
   begin { Checking both available IDs. }
     result := ErrorInvalidID;
     exit;
-  end;         
+  end;
 
+  if ( (self.fIO40ID <> cDefaultIdIO40IS1885L) and (self.fIO40ID <> cVariant1IdIO40IS1885L) ) then
+  begin
+    log.event(STACK_LEVEL, 'ERROR! invalid internal coupler ID', Logger.logLevel_Error);
+    result := ErrorInvalidID;
+    exit;
+  end;
+
+  fUseActualMeasImage := StrToIntDef(Copy(self.fCouplerID, 11, 2), -1) >= 1;  // V.01 and later supports this
   { Set desired watchdog time (0 to deactivate) }
+  log.event(STACK_LEVEL, 'set desired watchdog time (0 to deactivate): %d', [aWatchdogTime], Logger.logLevel_Debug);
   result := self.write_raw($1121, $BECF);
   if (result <> OK) then exit;
   result := self.write_raw($1121, $AFFE);
   if (result <> OK) then exit;
   result := self.write_raw($1120, aWatchdogTime);
   if (result <> OK) then exit;
-  result := self.write_raw($1122, $0001);    
+  result := self.write_raw($1122, $0001);
   if (result <> OK) then exit;
   result := self.write_raw($1121, $BECF);
   if (result <> OK) then exit;
@@ -1392,6 +1530,28 @@ begin
   b := (((1 shl DigIn_Option_USense) and w) <> 0);
   if (b) then self.fInstOpts := self.fInstOpts + [optUSense];
 
+  { Unique ID, SW version etc. }
+  sleep(5);
+  n := AddrSpec_SysStatus - AddrSpec_SysTypVer + 1; // complete new block of registers from V.01
+  result := self.readMulti_raw(AddrSpec_SysTypVer, n, a);
+  if (result <> OK) then result := self.readMulti_raw(AddrSpec_SysTypVer, n, a);
+  if (result <> OK) then result := self.readMulti_raw(AddrSpec_SysTypVer, n, a);
+  if (result = OK) then
+  begin
+    fSysTypVer := IntToHex(a[0], 4);
+
+    s := '';
+    for i := 1 to 8 do
+    begin                                                                                      
+      s := s + IntToHex(a[i], 4);
+    end;
+    self.fUniqueID := s;
+
+    self.fHWVer := IntToStr(WordRec(a[9]).Hi) + '.' + IntToStr(WordRec(a[9]).Lo);
+
+    self.fSWVer := IntToStr(WordRec(a[10]).Hi) + '.' + IntToStr(WordRec(a[10]).Lo) + ' build ' + IntToStr(a[11]);
+  end;
+
   { Check Analog Input f(24V) }
   result := self.readAI(AlogIn_24V, x, cPowerSupplyRange);
   if (result = OK) then
@@ -1431,25 +1591,46 @@ begin
 end;
 
 
+function T_IS1885L.devTestOff: TRetVal;
+const
+  cAction: TAction = actTestOff;
+
+var
+  dummy:  Word;
+
+begin
+  result := self.checkPrologue;
+  if (result <> OK) then exit;
+
+  dummy := 0;
+  result := basicThreadAction(self.fThread, cAction, self.fCommTout, cNoAddr, dummy);
+end;
+
 function T_IS1885L.devTestStart_I6: TRetVal;
 const
   cAction: TAction = actTestStart;
 
 var
   w:  Word;
-  
 begin
+  log.event(STACK_LEVEL, 'I6 test start', Logger.logLevel_Debug);
   result := self.checkPrologue;
-  if (result <> OK) then exit;
+  if (result <> OK) then
+  begin
+    log.event(STACK_LEVEL, 'prologue checking FAILED!', Logger.logLevel_Error);
+    exit;
+  end;
 
   w := Ord(tkI6_InsulationTest);
+  log.event(STACK_LEVEL, 'basicThreadAction (devTestStart_I6) call', Logger.logLevel_Debug);
   result := basicThreadAction(self.fThread, cAction, self.fCommTout, cNoAddr, w);
+  log.event(STACK_LEVEL, 'result: %d', [result], Logger.logLevel_Debug);
 end;
 
 
 function T_IS1885L.devTestPrep_I6(aTestTime, aRampTime, aUstart, aUnom, aRmin, aDetectDelay: Double;
     aRampDown, aInverted, a4wire: Boolean;
-    aAvgResWinSize, aAvgResDelay: Integer): TRetVal;
+    aAvgResWinSize, aAvgResDelay: Integer; aDischargeTimeout: Integer; aDischargeVoltage: Integer): TRetVal;
 const
   cAction: TAction = actTestPrep;
 
@@ -1467,8 +1648,15 @@ var
 {$endif}
 
 begin
+  log.event(STACK_LEVEL, 'I6 test configuration', Logger.logLevel_Debug);
   result := self.checkPrologue;
-  if (result <> OK) then exit;
+  if (result <> OK) then
+  begin
+    log.event(STACK_LEVEL, 'prologue checking FAILED!', Logger.logLevel_Error);
+    exit;
+  end;
+
+  log.event(STACK_LEVEL, 'checking of parameters', Logger.logLevel_Debug);
 
   result := ErrorInvalidTestParam;
   if (aTestTime < cParTestTimeLimitMin) then exit;
@@ -1486,6 +1674,9 @@ begin
   if (aAvgResWinSize > cAvgResWinSizeMax) then exit;
   if (aAvgResDelay < cAvgResDelayMin) then exit;
   if (aAvgResDelay > cAvgResDelayMax) then exit;
+  if (aDischargeVoltage > cParUnomLimitMax) then exit;
+  if (aDischargeVoltage <= 0) then exit;
+
 
   result := ErrorInvalidTestParamRng;
   rng := T_IS1885L.calcRrange(aUnom);
@@ -1493,6 +1684,7 @@ begin
 
   if ( (a4wire) and (not (optUSense in self.fInstOpts)) ) then
   begin
+    log.event(STACK_LEVEL, 'ERROR! 4-wire configured, but not available', Logger.logLevel_Error);
     result := ErrorNoOptUsense;
     exit;
   end;
@@ -1501,19 +1693,26 @@ begin
   b := true;
 
   { Set Digital Out for K1 - normal test }
+  if ( not aInverted ) then
+    log.event(STACK_LEVEL, 'set DO for K1 - normal test', Logger.logLevel_Debug);
   b := b and (self.writeDO(DigOut_K1_HV_Normal, not aInverted) = OK);
 
   { Opt.: set Digital Out for K2, inverted test instead of K1 }
+  if ( aInverted ) then
+    log.event(STACK_LEVEL, 'opt.: set DO for K2, inverted test instead of K1', Logger.logLevel_Debug);
   b := b and (self.writeDO(DigOut_K2_HV_Inverted, aInverted) = OK);
 
   { Opt.: set additional Digital Output for K3 USense }
+  if ( a4wire ) then
+    log.event(STACK_LEVEL, 'opt.: set additional DO for K3 USense', Logger.logLevel_Debug);
   b := b and (self.writeDO(DigOut_K3_HV_Sense, a4wire) = OK);
 
-  { Opt.: set Ramp Function with CW B7 in R0 and R1 for Addresses 0x0800 and 0x0801 - R10= start value, R1 = time value }
 {$ifdef RAMP_UP}
   { Opt.: set Ramp Function with CW B7 in R0 and R1 for Addresses 0x0800 and 0x0801 - R10= start value, R1 = time value }
+  log.event(STACK_LEVEL, 'opt.: set ramp function with CW B7 in R0 and R1 for addresses 0x0800 and 0x0801 - R10= start value, R1= time value', Logger.logLevel_Debug);
   CB := Addr_OutImg_AO1 - 1;
   x := (aUstart - self.fCalibrationData[Ord(BKUNomOff)]) * self.fCalibrationData[Ord(BKUNomFact)];
+  if ( x < 0.0 ) then x := 0.0; { never use negative values (e.g. after offset correction }
   x := x * cScale16bWriteMult * cUrangeWriteMult;
   b := b and (self.regCommWrite(CB, 0, Trunc(x)) = OK);
   b := b and (self.regCommRead(CB, 0, w) = OK);
@@ -1524,9 +1723,10 @@ begin
 {$endif}
 
   { Set NO Current range - for IS test, no current range is selected, HG40 will run on automatic current range mode. }
-
+  log.event(STACK_LEVEL, 'set no current range - for IS test, no current range is selected, HG40 will run on automatic current range mode', Logger.logLevel_Debug);
   { Setting of AO and disabling of K Discharge DO is moved to the actTestStart procedure itself. }
-  
+  log.event(STACK_LEVEL, 'setting of AO and disabling of K discharge DO is moved to the actTestStart procedure itself', Logger.logLevel_Debug);
+
   if (not b) then
   begin
     result := ErrorCommunication;
@@ -1548,17 +1748,25 @@ begin
     Usense        := a4wire and (optUSense in self.fInstOpts);
     AvgResWinSize := aAvgResWinSize;
     AvgResDelay   := aAvgResDelay;
+    DischargeTimeout:= aDischargeTimeout;
+    DischargeVoltage:= aDischargeVoltage;
   end;
   TCommThreadIS1885L(self.fThread).passI6Params(p);
 
+  self.fGlobStat := STA_TEST_IDLE;
+  self.fFinished := FALSE;
+
   w := Ord(tkI6_InsulationTest);
+
+  log.event(STACK_LEVEL, 'basicThreadAction (devTestPrep_I6) call', logger.logLevel_Debug);
   result := basicThreadAction(self.fThread, cAction, self.fCommTout, cNoAddr, w);
-end;  
+  log.event(STACK_LEVEL, 'result: %d', [result], logger.logLevel_Debug);
+end;
 
 
-function T_IS1885L.devTestGet_I6(var aTotalRemTime, aRemTime, aUgen, aUreal, aRreal: Double;
+function T_IS1885L.devTestGet_I6(var aTotalRemTime, aRemTime, aUgen, aUreal, aIreal, aRreal: Double;
                                  var aErrCode: Integer; var aGlobStat: Byte;
-                                 var aOL, aFinished: Boolean): TRetVal;
+                                 var aOL, aFinished, aSPO: Boolean): TRetVal;
 begin
   self.fCSTestStat.Enter; { lock the data to not update them during gathering operation }
 
@@ -1566,11 +1774,13 @@ begin
   aRemTime := self.fRemainTime;
   aUgen := self.fUgen;
   aUreal := self.fUreal;
+  aIreal := self.fIreal;
   aRreal := self.fRreal;
   aGlobStat := self.fGlobStat;
   aErrCode := self.fErrCode;
   aOL := self.fOL;
   aFinished := self.fFinished;
+  aSPO := self.fSPO;
 
   self.fCSTestStat.Leave;
   
@@ -1596,7 +1806,7 @@ begin
 end;
 
 
-function T_IS1885L.devTestPrep_H6(aTestTime, aRampTime, aUstart, aUnom, aImin, aImax: Double; aRampDown, aInverted, a4wire: Boolean): TRetVal;
+function T_IS1885L.devTestPrep_H6(aTestTime, aRampTime, aUstart, aUnom, aImin, aImax: Double; aRampDown, aInverted, a4wire: Boolean; aDischargeTimeout:Integer; aDischargeVoltage:Integer): TRetVal;
 const
   cAction: TAction = actTestPrep;
 
@@ -1617,18 +1827,19 @@ begin
   if (result <> OK) then exit;
 
   result := ErrorInvalidTestParam;
+//  log.event(Format('Imax = %.5f; ImaxLimMin = %.5f; ImaxLimMax = %.5f', [aImax, cParImaxLimitMin, cParImaxLimitMax]));
   if (aTestTime < cParTestTimeLimitMin) then exit;
-  if (aTestTime > cParTestTimeLimitMax) then exit;
+  if (not Math.SameValue(aTestTime, cParTestTimeLimitMax)) and (aTestTime > cParTestTimeLimitMax) then exit;
   if (aRampTime < cParRampTimeLimitMin) then exit;
-  if (aRampTime > cParRampTimeLimitMax) then exit;
+  if (not Math.SameValue(aRampTime, cParRampTimeLimitMax)) and (aRampTime > cParRampTimeLimitMax) then exit;
   if (aUstart < cParUstartLimitMin) then exit;
   if (aUstart > cParUstartLimitMax) then exit;
   if (aUnom < cParUnomLimitMin) then exit;
   if (aUnom > cParUnomLimitMax) then exit;
   if (aImin < cParIminLimitMin) then exit;
-  if (aImin > cParIminLimitMax) then exit;
-  if (aImax < cParImaxLimitMin) then exit;
-  if (aImax > cParImaxLimitMax) then exit;
+  if (not Math.SameValue(aImin, cParIminLimitMax)) and (aImin > cParIminLimitMax) then exit;
+  if (not Math.SameValue(aImax, cParImaxLimitMin)) and (aImax < cParImaxLimitMin) then exit;
+  if (not Math.SameValue(aImax, cParImaxLimitMax)) and (aImax > cParImaxLimitMax) then exit;
 
   if ( (a4wire) and (not (optUSense in self.fInstOpts)) ) then
   begin
@@ -1649,9 +1860,11 @@ begin
   b := b and (self.writeDO(DigOut_K3_HV_Sense, a4wire) = OK);
 
 {$ifdef RAMP_UP}
+  log.event(STACK_LEVEL, 'preparing ramp outside the function', logLevel_Verbose);
   { Opt.: set Ramp Function with CW B7 in R0 and R1 for Addresses 0x0800 and 0x0801 - R10= start value, R1 = time value }
   CB := Addr_OutImg_AO1 - 1;
   x := (aUstart - self.fCalibrationData[Ord(BKUNomOff)]) * self.fCalibrationData[Ord(BKUNomFact)];
+  if ( x < 0.0 ) then x := 0.0; { never use negative values (e.g. after offset correction }
   x := x * cScale16bWriteMult * cUrangeWriteMult;
   b := b and (self.regCommWrite(CB, 0, Trunc(x)) = OK);
   b := b and (self.regCommRead(CB, 0, w) = OK);
@@ -1684,6 +1897,8 @@ begin
     RampDown := aRampDown;
     Inverted := aInverted;
     Usense   := a4wire and (optUSense in self.fInstOpts);
+    DischargeTimeout:= aDischargeTimeout;
+    DischargeVoltage:= aDischargeVoltage;
   end;
   TCommThreadIS1885L(self.fThread).passH6Params(p);
 
@@ -1694,7 +1909,7 @@ end;
 
 function T_IS1885L.devTestGet_H6(var aTotalRemTime, aRemTime, aUgen, aUreal, aIreal: Double;
                                  var aErrCode: Integer; var aGlobStat: Byte;
-                                 var aFinished: Boolean): TRetVal;
+                                 var aFinished, aSPO: Boolean): TRetVal;
 begin
   self.fCSTestStat.Enter; { lock the data to not update them during gathering operation }
 
@@ -1706,6 +1921,7 @@ begin
   aGlobStat := self.fGlobStat;
   aErrCode := self.fErrCode;
   aFinished := self.fFinished;
+  aSPO := self.fSPO;
 
   self.fCSTestStat.Leave;
   
@@ -1719,37 +1935,37 @@ class function T_IS1885L.showRetVal(const aCode: TRetVal; const aDescription: Bo
 begin
   if (aDescription) then
   case aCode of
-    OK:                       result := 'OK';
-    ErrorGeneral:             result := 'General error!';
-    ErrorDisconnected:        result := 'Client is not connected!';
-    ErrorNotYetReady:         result := 'Operation result is not yet ready!';
-    ErrorBusy:                result := 'Device is busy!';
-    ErrorInvalidAction:       result := 'Requested invalid action!';
-    ErrorInvalidRegNr:        result := 'Requested invalid register number (range of 6b unsigned value)!';
-    ErrorNotRequested:        result := 'Action is not requested!';
-    ErrorTimedOut:            result := 'Action timed out!';
-    ErrorCommunication:       result := 'Communication error!';
-    ErrorInvalidAddress:      result := 'Address is invalid!';
-    ErrorInvalidDINumber:     result := 'Digital input number is invalid!';
-    ErrorInvalidDONumber:     result := 'Digital output number is invalid!';
-    ErrorInvalidAINumber:     result := 'Analog input number is invalid!';
-    ErrorInvalidAONumber:     result := 'Analog output number is invalid!';
-    ErrorValueOutOfRange:     result := 'Value is out of range!';
-    ErrorShortArray:          result := 'Given array is too short (not enough elements)!';
-    ErrorTooManyValues:       result := 'Exceeded limit of supported values in array!';
-    ErrorNoArrayReference:    result := 'Missing reference for array!';
-    ErrorPowerSupplyLowVolt:  result := 'Detected low voltage of power supply!';
-    ErrorPowerSupplyHighVolt: result := 'Detected high voltage of power supply!';
-    ErrorInvalidRange:        result := 'Given range is invalid (e.g. negative or zero)!';
-    ErrorInvalidTest:         result := 'Detected invalid test!';
-    ErrorInvalidID:           result := 'Wrong device ID!';
-    ErrorHG40NotReady:        result := 'Generator HG40 is not ready for operation!';
-    ErrorAlreadyInTest:       result := 'Test is already running!';
-    ErrorInvalidTestParam:    result := 'Invalid test parameter!';
-    ErrorNotYetPreparedTest:  result := 'Test it not yet prepared! One has to call devTestPrep_XX() before calling devTestStart_XX().';
-    ErrorNoOptUsense:         result := 'The device does not have installed Usense module!';
-    StatNoActionYet:          result := 'No action has been yet fired.';
-    ErrorInvalidTestParamRng: result := 'Invalid test parameter (variable resistance range exceeded)!';
+    OK:                       result := 'OK [No Error]';
+    ErrorGeneral:             result := 'General error! [ErrorGeneral]';
+    ErrorDisconnected:        result := 'Client is not connected! [ErrorDisconnected]';
+    ErrorNotYetReady:         result := 'Operation result is not yet ready! [ErrorNotYetReady]';
+    ErrorBusy:                result := 'Device is busy! (Watchdog running) [ErrorBusy]';
+    ErrorInvalidAction:       result := 'Requested invalid action! [ErrorInvalidAction]';
+    ErrorInvalidRegNr:        result := 'Requested invalid register number (range of 6b unsigned value)! [ErrorInvalidRegNr]';
+    ErrorNotRequested:        result := 'Action is not requested! [ErrorNotRequested]';
+    ErrorTimedOut:            result := 'Action timed out! [ErrorTimedOut]';
+    ErrorCommunication:       result := 'Communication error! [ErrorCommunication]';
+    ErrorInvalidAddress:      result := 'Address is invalid! [ErrorInvalidAddress]';
+    ErrorInvalidDINumber:     result := 'Digital input number is invalid! [ErrorInvalidDINumber]';
+    ErrorInvalidDONumber:     result := 'Digital output number is invalid! [ErrorInvalidDONumber]';
+    ErrorInvalidAINumber:     result := 'Analog input number is invalid! [ErrorInvalidAINumber]';
+    ErrorInvalidAONumber:     result := 'Analog output number is invalid! [ErrorInvalidAONumber]';
+    ErrorValueOutOfRange:     result := 'Value is out of range! [ErrorValueOutOfRange]';
+    ErrorShortArray:          result := 'Given array is too short (not enough elements)! [ErrorShortArray]';
+    ErrorTooManyValues:       result := 'Exceeded limit of supported values in array! [ErrorTooManyValues]';
+    ErrorNoArrayReference:    result := 'Missing reference for array! [ErrorNoArrayReference]';
+    ErrorPowerSupplyLowVolt:  result := 'Detected low voltage of power supply! [ErrorPowerSupplyLowVolt]';
+    ErrorPowerSupplyHighVolt: result := 'Detected high voltage of power supply! [ErrorPowerSupplyHighVolt]';
+    ErrorInvalidRange:        result := 'Given range is invalid (e.g. negative or zero)! [ErrorInvalidRange]';
+    ErrorInvalidTest:         result := 'Detected invalid test! [ErrorInvalidTest]';
+    ErrorInvalidID:           result := 'Wrong device ID! [ErrorInvalidID]';
+    ErrorHG40NotReady:        result := 'Generator HG40 is not ready for operation! [ErrorHG40NotReady]';
+    ErrorAlreadyInTest:       result := 'Test is already running! [ErrorAlreadyInTest]';
+    ErrorInvalidTestParam:    result := 'Invalid test parameter! [ErrorInvalidTestParam';
+    ErrorNotYetPreparedTest:  result := 'Test it not yet prepared! One has to call devTestPrep_XX() before calling devTestStart_XX(). [ErrorNotYetPreparedTest]';
+    ErrorNoOptUsense:         result := 'The device does not have installed Usense module! [ErrorNoOptUsense]';
+    StatNoActionYet:          result := 'No action has been yet fired. [StatNoActionYet]';
+    ErrorInvalidTestParamRng: result := 'Invalid test parameter (variable resistance range exceeded)! [ErrorInvalidTestParamRng]';
     else                      result := '??';
   end
   else
@@ -1804,6 +2020,7 @@ begin
     tpRampUp:     result := 'ramp up';
     tpTest:       result := 'test';
     tpRampDown:   result := 'ramp down';
+    tpDischarging:result := 'discharging';
     tpFinishing:  result := 'finishing';
     else          result := '?? (' + IntToStr(Ord(aTestPhase)) + ')';
   end;
@@ -1856,17 +2073,20 @@ begin
   begin
     if (Finished) then
     begin
+      log.event(STACK_LEVEL, 'I6 test finished', logger.logLevel_Debug);
       self.fAlreadyRead := false;
       self.fRemainTime := PhaseRemainTime;
       self.fTotRemTime := TotalRemainTime;
       self.fUgen := LastU;
       if (SensingEnabled) then self.fUreal := LastUsense
       else                     self.fUreal := LastU;
+      self.fIreal := LastI;
       self.fRreal := LastR;
       self.fGlobStat := STA_TEST_FINISHED;
       self.fErrCode := ErrorCode;
       self.fOL := LastOL;
       self.fFinished := Finished;
+      self.fSPO := ReadSPO;
     end
     else
     begin
@@ -1876,16 +2096,18 @@ begin
       self.fUgen := ConvU;
       if (SensingEnabled) then self.fUreal := ConvUsense
       else                     self.fUreal := ConvU;
+      self.fIreal := ConvI;
       self.fRreal := AvgConvR;
       self.fGlobStat := cTestPhase2GlobStat[TestPhase];
       self.fErrCode := ErrorCode;
       self.fOL := FlagOL;
       self.fFinished := Finished;
+      self.fSPO := ReadSPO;
     end;
   end;
   
 {$ifdef SERVICE}
-  if (Assigned(self.fOnUpdate)) then self.fOnUpdate(fTotRemTime, fRemainTime, fUgen, fUreal, fRreal, fGlobStat, fErrCode, fOL, fFinished);
+  if (Assigned(self.fOnUpdate)) then self.fOnUpdate(fTotRemTime, fRemainTime, fUgen, fUreal, fIreal, fRreal, fGlobStat, fErrCode, fOL, fFinished, fSPO);
   if (Assigned(self.fOnUpdateAll)) then self.fOnUpdateAll(@TCommThreadIS1885L(aThread).fTestStatus[tkI6_InsulationTest]);
 {$endif}
 end;
@@ -1907,6 +2129,7 @@ begin
       self.fGlobStat := STA_TEST_FINISHED;
       self.fErrCode := ErrorCode;
       self.fFinished := Finished;
+      self.fSPO := ReadSPO;
     end
     else
     begin
@@ -1920,11 +2143,12 @@ begin
       self.fGlobStat := cTestPhase2GlobStat[TestPhase];
       self.fErrCode := ErrorCode;
       self.fFinished := Finished;
+      self.fSPO := ReadSPO;
     end;
   end;
   
 {$ifdef SERVICE}
-  if (Assigned(self.fOnUpdate)) then self.fOnUpdate(fTotRemTime, fRemainTime, fUgen, fUreal, fIreal, fGlobStat, fErrCode, fOL, fFinished); 
+  if (Assigned(self.fOnUpdate)) then self.fOnUpdate(fTotRemTime, fRemainTime, fUgen, fUreal, fIreal, NaN, fGlobStat, fErrCode, fOL, fFinished, fSPO);
   if (Assigned(self.fOnUpdateAll)) then self.fOnUpdateAll(@TCommThreadIS1885L(aThread).fTestStatus[tkH6_HighVoltageTest]);
 {$endif}
 end;
@@ -1971,7 +2195,6 @@ begin
   begin
     BaseRegister := cModbusTcpBaseRegDefault;  // Important !!!
   end;
-
   with self.fLastCommErr do
   begin
     kind := cekNoError;
@@ -1994,6 +2217,8 @@ begin
   self.fTimeRampUpEnd   := 0;
   self.fTimeRampDnStart := 0; 
   self.fTimeTestEnd     := 0;
+  self.fTimeDischargeEnd:= 0;
+  self.fTimeDischargeStart:= 0;
   self.fTimeDetectStart := 0;
   self.fTimeUminCheck   := 0;
 
@@ -2003,7 +2228,6 @@ begin
   end;
 
   self.fConnected := false;
-  
   for act := Low(act) to High(act) do
   with self.fRequests[act] do
   begin
@@ -2068,6 +2292,12 @@ begin
     self.fTempInputImage[i] := 0;
   end;
 
+  for i:= AddrSpec_ActualMeas_min to AddrSpec_ActualMeas_max do
+  begin
+    self.fActualMeasImage[i] := 0;
+    Self.fTempActualMeasImage[i] := 0;
+  end;
+
   for i := DigOut_min to DigOut_max do self.fDigOutImage[i] := false;
 
   for ci := Low(ci) to High(ci) do
@@ -2101,6 +2331,7 @@ var
   x:    Double;
   y:    Double;    
   i:    Integer;
+  w:    word;
 //  HGon: Boolean;
 
 begin
@@ -2114,6 +2345,7 @@ begin
       if (t > self.fUpdateGapStart + cUpdateGapDefault) then  { guard by ``update gap'' }
       begin
         upd := (self.request(actForceReadInputImage) = OK);
+//        log.event('CommThreadIS1885L','execute','actForceReadInputImage requested, result = '+booltostr(upd,True));
       end;
     end;
 
@@ -2122,7 +2354,7 @@ begin
       if ( (self.fRequests[act].fReq) and (not self.fRequests[act].fReady) ) then { new request }
       begin
         self.doAction(act);
-
+//        log.event('CommThreadIS1885L','execute','action '+inttostr(ord(act))+' performed');
         if (act = actForceReadInputImage) then
         begin { reaction on reading of new input image }
           if (self.fTestRun in [tkI6_InsulationTest, tkH6_HighVoltageTest]) then
@@ -2135,10 +2367,18 @@ begin
             self.fTestStatus[tst].ElapsedTime := self.fTimeLastRead - self.fTimeTestStart;
             if (self.fTimeLastRead >= self.fTimeTestEnd) then
             with self.fTestStatus[tst] do
-            begin               
+            begin
               TotalRemainTime := 0.0;
               PhaseRemainTime := 0.0;
-              Finishing := true;
+              self.writeCoil(DigOut_HV_Enable, false);
+              self.writeRegister(Addr_OutImg_AO1, 0);
+              if not Discharging and not Finishing and not Finished then  //set Discharging only once per test
+              begin
+                self.fTimeDischargeStart:=self.fTimeLastRead+150;
+                if self.fTestKind[rocCurrent]=tkH6_HighVoltageTest then self.fTimeDischargeEnd:=self.fH6Params[rocCurrent].DischargeTimeout else self.fTimeDischargeEnd:=self.fI6Params[rocCurrent].DischargeTimeout;
+                self.fTimeDischargeEnd:=self.fTimeDischargeStart+self.fTimeDischargeEnd;
+                Discharging := true;
+              end;
             end
             else
             with self.fTestStatus[tst] do
@@ -2149,6 +2389,7 @@ begin
                 tpRampUp:     PhaseRemainTime := (self.fTimeRampUpEnd - self.fTimeLastRead) / 1000.0;
                 tpTest:       PhaseRemainTime := (self.fTimeRampDnStart - self.fTimeLastRead) / 1000.0;
                 tpRampDown:   PhaseRemainTime := (self.fTimeTestEnd - self.fTimeLastRead) / 1000.0;
+                tpDischarging:PhaseRemainTime := 0.0;//todo is RemainTime needed
                 tpFinishing:  PhaseRemainTime := 0.0;
                 tpIdle:       PhaseRemainTime := 0.0;
               end;
@@ -2160,8 +2401,12 @@ begin
 {$endif}
             end;
 
+//            log.event('CommThreadIS1885L','execute','test time and phase updated. Phase = '+inttostr(Ord(self.fTestStatus[Tst].testPhase)));
+
             { Processing of values from updated input image. }
-            self.doProcessReading(tst);
+            self.doProcessReading(tst,true);    // TODO: based on hardware version
+
+//            log.event('CommThreadIS1885L','execute','readings processed');
 
             { Optional assignment of error code (e.g. limit checking). }
 {$ifndef STANDALONE_IO40}
@@ -2172,7 +2417,7 @@ begin
             begin
               if (ConvU >= LimitUmin) then
               begin
-                self.fTestStatus[tst].TestPhase := tpTest;//voltage OK, go test phase
+                self.fTestStatus[tst].TestPhase := tpTest;  //voltage OK, go to the test phase
                 self.fTimeRampUpEnd := self.fTimeLastRead;
 
                 t := self.fTimeLastRead - self.fTimeWaitVoltStart;  //time diff used for wait for voltage
@@ -2184,35 +2429,49 @@ begin
               end;
             end;
 
+//            log.event('CommThreadIS1885L','execute','Time intent updated');
             { Evaluation of limits }
             with self.fTestStatus[tst] do
             if (ErrorCode = 0) then
             case tst of
               tkI6_InsulationTest:
               begin
+                if (IsNan(ConvR)) then log.event(uID, mID, 'ConvR is NaN!', logger.logLevel_Error);
+                if (IsNan(ConvU)) then log.event(uID, mID, 'ConvU is NaN!', logger.logLevel_Error);
+                if (IsNan(ConvUsense)) then log.event(uID, mID, 'ConvUsense is NaN!', logger.logLevel_Error);
+
                 if (self.fTestStatus[tst].TestPhase = tpTest) then
                 begin
-                  if ( (ConvR < LimitRmin) and (self.fTimeLastRead >= self.fTimeDetectStart) ) then
+                  if ( (not IsNan(ConvR)) and (ConvR > 0.0) and (ConvR < LimitRmin) and (self.fTimeLastRead >= self.fTimeDetectStart) ) then
                   begin { low resistance (over-current) }
+                    log.event(uID, mID, 'ERROR! low resistance (over-current)', logger.logLevel_Error);
+                    log.event(uID, mID, Format('ConvR: %g Ohm; LimitRmin: %g Ohm', [ConvR, LimitRmin]), logger.logLevel_Error);
                     ErrorCode := I6_LOWRESISTANCE;
                   end
-                  else if ( (ConvU < LimitUmin) {and (ReadU_minor < LimitUmin) and (self.fTimeLastRead >= self.fTimeUminCheck)} ) then
+                  else if ( (not IsNaN(ConvU)) and (ConvU < LimitUmin) {and (ReadU_minor < LimitUmin) and (self.fTimeLastRead >= self.fTimeUminCheck)} ) then
                   begin { under-voltage }
+                    log.event(uID, mID, 'ERROR! under-voltage', logger.logLevel_Error);
+                    log.event(uID, mID, Format('ConvU: %g V; LimitUmin: %g V', [ConvU, LimitUmin]), logger.logLevel_Error);
                     ErrorCode := I6_LOWVOLTAGE;
                   end
-                  else if (ConvU > LimitUmax) then
+                  else if ((not IsNaN(ConvU)) and (ConvU > LimitUmax)) then
                   begin { over-voltage }
+                    log.event(uID, mID, 'ERROR! over-voltage', logger.logLevel_Error);
+                    log.event(uID, mID, Format('ConvU: %g V; LimitUmax: %g V', [ConvU, LimitUmax]), logger.logLevel_Error);
                     ErrorCode := I6_HIGHVOLTAGE;
                   end
                   else if (SensingEnabled) then
                   begin
                     { sense under-voltage }
-                    if (ConvUsense < LimitUsenseMin) then
+                    if ((not IsNaN(ConvUsense)) and (ConvUsense < LimitUsenseMin)) then
                     begin
+                      log.event(uID, mID, 'ERROR! sense under-voltage', logger.logLevel_Error);
                       ErrorCode := I6_SENSE_VOLTAGE;
                     end
-                    else if (ConvUsense > LimitUsenseMax) then
+                    else if ((not IsNaN(ConvUsense)) and (ConvUsense > LimitUsenseMax)) then
                     begin { sense over-voltage }
+                      log.event(uID, mID, 'ERROR! sense over-voltage', logger.logLevel_Error);
+                      log.event(uID, mID, Format('ConvUsense: %g V; LimitUsenseMax: %g V', [ConvUsense, LimitUsenseMax]), logger.logLevel_Error);
                       ErrorCode := I6_SENSE_VOLTAGE;
                     end;
                   end;
@@ -2237,24 +2496,29 @@ begin
                 begin
                   if ( (ConvU < LimitUmin) {and (ReadU_minor < LimitUmin) and (self.fTimeLastRead >= self.fTimeUminCheck)} ) then
                   begin { under-voltage }
+                    log.event(uID, mID, 'ERROR! under-voltage', logger.logLevel_Error);
                     ErrorCode := H6_LOWVOLTAGE;
                   end
                   else if (ConvI < LimitImin) then
                   begin { under-current }
+                    log.event(uID, mID, 'ERROR! under-current', logger.logLevel_Error);
                     ErrorCode := H6_LOWCURRENT;
                   end
                   else if (ConvU > LimitUmax) then
                   begin { over-voltage }
+                    log.event(uID, mID, 'ERROR! over-voltage', logger.logLevel_Error);
                     ErrorCode := H6_HIGHVOLTAGE;
                   end
                   else if (SensingEnabled) then
                   begin
                     if (ConvUsense < LimitUsenseMin) then
                     begin { sense under-voltage }
+                      log.event(uID, mID, 'ERROR! sense under-voltage', logger.logLevel_Error);
                       ErrorCode := H6_SENSE_VOLTAGE;
                     end
                     else if (ConvUsense > LimitUsenseMax) then
                     begin { sense over-voltage }
+                      log.event(uID, mID, 'ERROR! sense over-voltage', logger.logLevel_Error);
                       ErrorCode := H6_SENSE_VOLTAGE;
                     end;
                   end;
@@ -2263,15 +2527,32 @@ begin
             end;
 {$endif}
 {$endif}
-
+//            log.event('CommThreadIS1885L','execute','Limits processed.');
             { Optional finishing of the test. }
             b := (self.fTestStatus[tst].ErrorCode <> 0);
+            if self.fTestStatus[tst].Discharging then
+            begin
+              self.readRegister(Addr_InImg_AI3, w);
+              X:=6000*W/$7FFF;
+              X:=(X-fCalibOffset[BKUReal])*fCalibFactor[BKUReal];
+              if self.fTestKind[rocCurrent]=tkH6_HighVoltageTest then Y:=self.fH6Params[rocCurrent].DischargeVoltage else Y:=self.fI6Params[rocCurrent].DischargeVoltage;
+              if (self.fTimeLastRead >= self.fTimeDischargeEnd) or (X<Y) then
+              begin
+                self.fTestStatus[tst].Finishing := true;
+                self.fTestStatus[tst].Discharging := false;
+              end else
+              if self.fTimeLastRead >= self.fTimeDischargeStart then
+              begin
+                self.writeCoil(DigOut_K_Discharge, false);
+                self.fTimeDischargeStart:=fTimeDischargeEnd;
+              end;
+            end else
             if ( (self.fTestStatus[tst].Finishing) or (b) ) then
             begin
 //              i := 10;
 //              brk := false;
 //              while (i > 0) do // simple few times repeat
-//              begin       
+//              begin
 //                sleep(10);
 //                try
 //                  if (self.writeCoil(DigOut_HV_Enable, false) = OK) then
@@ -2294,16 +2575,17 @@ begin
 //
 //              if (not HGon) then
               begin
-                sleep(25);
+//               self.writeCoil(DigOut_HV_Enable, false);
+ //               self.writeRegister(Addr_OutImg_AO1, 0);
+ //               sleep(200);
                 for i := DigOut_min to DigOut_max_used do self.fDigOutImage[i] := false;
                 if (self.writeCoils(0, Length(self.fDigOutImage), self.fDigOutImage) = OK) then
+ //               if self.writeCoil(DigOut_K_Discharge, false) = OK then
                 begin
                   self.fTestStatus[tst].Finishing := false;
                   self.fTestStatus[tst].Finished := true;
                   self.fTestRun := tkNoTest;
-
-                  sleep(25);
-                  self.writeRegister(Addr_OutImg_AO1, 0);
+//                  sleep(25);
                 end;
               end;
             end
@@ -2335,15 +2617,17 @@ begin
               self.writeRegister(Addr_OutImg_AO1, 0);
             end;
 
+//            log.event('CommThreadIS1885L','execute','After test end cleanup checks.');
+
             { Extra handling for very high values of DetectDelay parameter (I6 only) - additional check for Rmin limit (finishing) }
-            if ( ((self.fTestRun = tkNoTest) or (rdwn)) and (tst = tkI6_InsulationTest) and
-                 (self.fTimeLastRead < self.fTimeDetectStart) ) then
+            if ( ((self.fTestRun = tkNoTest) or (rdwn)) and (tst = tkI6_InsulationTest) and (self.fTimeLastRead < self.fTimeDetectStart) ) then
             with self.fTestStatus[tst] do
             begin
               if (ErrorCode = 0) then
               begin
-                if (ConvR < LimitRmin)  then
+                if ((not IsNaN(ConvR)) and (ConvR < LimitRmin))  then
                 begin
+                  log.event(uID, mID, 'ERROR! low resistance', logger.logLevel_Error);
                   self.fTestStatus[tst].ErrorCode := I6_LOWRESISTANCE;
                 end;
               end;
@@ -2351,6 +2635,7 @@ begin
 
             { To update intermediate values in interface object. }
             self.doUpdateStatus(tst);
+//            log.event('CommThreadIS1885L','execute','Test status updated.');
           end;
         end;
 
@@ -2358,8 +2643,10 @@ begin
       end;
     end;
 
-    if (upd) then self.ack(actForceReadInputImage);
-
+    if (upd) then begin
+      self.ack(actForceReadInputImage);
+//      log.event('CommThreadIS1885L','execute','actForceReadInputImage acknowledged, next update '+inttostr(self.fUpdateGapStart + cUpdateGapDefault - t)+'ms');
+    end;
     sleep(1);
   end;
 
@@ -2382,13 +2669,14 @@ var
   tt:     Double;
   rt:     Double;
   rd:     Boolean;
+  rampTime: Double;
 
 begin
   self.fRequests[aAction].fReady := false;  // to be sure
   retVal := ErrorGeneral;
 
   if ( (aAction <> actNewConnect) and (aAction <> actDisconnect) and (not self.fModbusClient.Connected) ) then
-  begin // expected connected client, but it is not                                   
+  begin // expected connected client, but it is not
     retVal := ErrorDisconnected;
     self.fConnected := false;
     self.fRequests[aAction].fRetWord := 0;
@@ -2401,12 +2689,17 @@ begin
       try
         if (self.fModbusClient.ReadInputRegisters(AddrRng_InImg_Min, Length(self.fTempInputImage), self.fTempInputImage)) then
         begin
-          retVal := OK;
-
+          b := self.fModbusClient.ReadInputRegisters(AddrSpec_ActualMeas_min, length(self.fTempActualMeasImage), self.fTempActualMeasImage );
+//          log.event('CommThreadIS1885L','doAction','Actual image values readout, result = '+boolToStr(b,True));
+          retVal := OK;   // always ok, failing of actual measurement image readout is expected on older hardware
           self.fCSInputImg.Enter;
           for i := AddrRng_InImg_Min to AddrRng_InImg_Max do
           begin
             self.fInputImage[i] := self.fTempInputImage[i];
+          end;
+
+          for i := AddrSpec_ActualMeas_min to AddrSpec_ActualMeas_max do begin
+            self.fActualMeasImage[i] := self.fTempActualMeasImage[i];
           end;
           self.fCSInputImg.Leave;
         end
@@ -2415,6 +2708,8 @@ begin
           retVal := ErrorCommunication;
         end;
       except
+        //need to fix if no connection available
+        self.fConnected := self.fModbusClient.Connected; //copy connection state
         retVal := ErrorCommunication;
       end;
 
@@ -2540,6 +2835,7 @@ begin
           retVal := ErrorCommunication;
         end;
       except
+        self.fConnected := self.fModbusClient.Connected; //copy connection state
         retVal := ErrorCommunication;
       end
     end;
@@ -2548,7 +2844,7 @@ begin
     actDisconnect:
     begin
       try
-        b := true;
+        b := self.fConnected;//true;
         b := b and (self.writeCoil(DigOut_HV_Enable, false) = OK);
         b := b and (self.writeCoil(DigOut_K_Discharge, false) = OK);
         b := b and (self.writeRegister(Addr_OutImg_AO1, 0) = OK);
@@ -2571,6 +2867,7 @@ begin
 
         retVal := OK;
       except
+        self.fConnected := self.fModbusClient.Connected; //copy connection state
         retVal := ErrorCommunication;
       end;
     end;
@@ -2596,10 +2893,32 @@ begin
           retVal := ErrorCommunication;
         end;
       except
+        self.fConnected := self.fModbusClient.Connected; //copy connection state
         retVal := ErrorCommunication;
       end;
     end;
-           
+
+    { --- }
+    actTestOff:
+    begin
+      try
+        b := true;
+        b := b and (self.writeCoil(DigOut_HV_Enable, false) = OK);
+        b := b and (self.writeRegister(Addr_OutImg_AO1, 0) = OK);
+        if (b) then
+        begin
+          retVal := OK;
+        end
+        else
+        begin
+          retVal := ErrorCommunication;
+        end;
+      except
+        self.fConnected := self.fModbusClient.Connected; //copy connection state
+        retVal := ErrorCommunication;
+      end;
+    end;
+
     { --- }
     actTestPrep:
     with self.fRequests[aAction] do
@@ -2652,7 +2971,7 @@ begin
 //              if (LimitUmax > $7FFFFF) then LimitUmax := $7FFFFF;
               LimitUmin := cUminPercDef * self.fI6Params[rocCurrent].Unom;
               LimitUmax := cUmaxPercDef * self.fI6Params[rocCurrent].Unom;
-              if (LimitUmax > cParUstartLimitMax) then LimitUmax := cParUstartLimitMax;
+//              if (LimitUmax > cParUstartLimitMax) then LimitUmax := cParUstartLimitMax;
 
               LimitImin := cParIminLimitMin; // Low(LimitImin);  // no direct checking of current value in IS test
               LimitImax := cParIminLimitMax; // High(LimitImax);
@@ -2662,9 +2981,15 @@ begin
 
               AvgConvRCacheSize := self.fI6Params[rocCurrent].AvgResWinSize;
               AvgConvRIndex := -1 - self.fI6Params[rocCurrent].AvgResDelay;
+
+              for i := 0 to AvgConvRCacheSize - 1 do
+              begin
+                AvgConvUCache[i] := 0;
+                AvgConvICache[i] := 0;
+              end;
             end;
 
-{$ifdef EXTERNAL_PROCEDURES} 
+{$ifdef EXTERNAL_PROCEDURES}
             retVal := OK;
             self.fTestStatus[tkI6_InsulationTest].ReadyToStart := true;
             self.fTestKind[rocRequested] := tkI6_InsulationTest;
@@ -2699,6 +3024,7 @@ begin
                 retVal := ErrorCommunication;
               end;
             except
+              self.fConnected := self.fModbusClient.Connected; //copy connection state
               retVal := ErrorCommunication;
             end;
 {$endif}
@@ -2736,7 +3062,7 @@ begin
 //              if (LimitUmax > $7FFFFF) then LimitUmax := $7FFFFF;
               LimitUmin := cUminPercDef * self.fH6Params[rocCurrent].Unom;
               LimitUmax := cUmaxPercDef * self.fH6Params[rocCurrent].Unom;
-              if (LimitUmax > cParUstartLimitMax) then LimitUmax := cParUstartLimitMax;
+//              if (LimitUmax > cParUstartLimitMax) then LimitUmax := cParUstartLimitMax;
 
 //              LimitImin := Trunc(self.fH6Params[rocCurrent].Imin * cScale24bWriteMult * cIrangeWriteMult_10mA);
 //              LimitImax := Trunc(self.fH6Params[rocCurrent].Imax * cScale24bWriteMult * cIrangeWriteMult_10mA);
@@ -2783,6 +3109,7 @@ begin
                 retVal := ErrorCommunication;
               end;
             except
+              self.fConnected := self.fModbusClient.Connected; //copy connection state
               retVal := ErrorCommunication;
             end;
 {$endif}
@@ -2840,18 +3167,38 @@ begin
           end;
 {$endif}
 
-          { Set Analog Out Unom }
+          { Set Analog Out Unom, ramp time }
           x := 0;
+          rampTime := cParRampTimeLimitMin;
           case self.fTestKind[rocRequested] of
-            tkI6_InsulationTest:  x := self.fI6Params[rocCurrent].Unom;
-            tkH6_HighVoltageTest: x := self.fH6Params[rocCurrent].Unom;
+            tkI6_InsulationTest:
+            begin
+              x := self.fI6Params[rocCurrent].Unom;
+              rampTime := self.fI6Params[rocCurrent].RampTime;
+            end;
+            tkH6_HighVoltageTest:
+            begin
+              x := self.fH6Params[rocCurrent].Unom;
+              rampTime := self.fH6Params[rocCurrent].RampTime;
+            end
             else b := false;
           end;
-          
+
+          if not (rampTime > cParRampTimeLimitMin) then
+            b := b and (self.writeRegister(Addr_OutImg_AO1, 0) = OK);   // set analog to 0 just in case, but only if ramp up is disabled
+          b := b and (self.writeCoil(DigOut_HV_Enable, FALSE) = OK);   // disable just for safety
+
           x := (x - self.fCalibOffset[BKUNom]) * fCalibFactor[BKUNom];
           if (x < 0) then x := 0;
           w := Trunc(x * cUrangeWriteMult * cScale16bWriteMult);
           if (w > $7FFF) then w := $7FFF;
+
+          { set analog out for K discharge }
+          b := b and (self.writeCoil(DigOut_K_Discharge, TRUE) = OK);
+
+          { 100ms sleep }
+          sleep(100);
+
           b := b and (self.writeRegister(Addr_OutImg_AO1, w) = OK);
 
           { Set Analog Out for K Discharge }
@@ -2889,8 +3236,8 @@ begin
             end;
 
             self.fTimeTestStart := timeGetTime;
-            self.fTimeWaitVoltStart := self.fTimeTestStart + Trunc(1000.0 * rt);
-            self.fTimeRampUpEnd := self.fTimeWaitVoltStart + CWaitforVoltageTimeout;
+            self.fTimeWaitVoltStart := self.fTimeTestStart + CWaitforVoltageTimeout;
+            self.fTimeRampUpEnd := self.fTimeWaitVoltStart + Trunc(1000.0 * rt);
             self.fTimeRampDnStart := self.fTimeRampUpEnd + Trunc(1000.0 * tt);
             self.fTimeTestEnd := self.fTimeRampDnStart;
             if (rd) then self.fTimeTestEnd := self.fTimeTestEnd + Trunc(1000.0 * rt);
@@ -2928,6 +3275,7 @@ begin
             retVal := rv;
           end;
         except
+          self.fConnected := self.fModbusClient.Connected; //copy connection state
           retVal := ErrorCommunication;
         end;
       end;
@@ -2939,7 +3287,7 @@ begin
 end;
 
 
-procedure TCommThreadIS1885L.doProcessReading(const aTestKind: TTestKind);
+procedure TCommThreadIS1885L.doProcessReading(const aTestKind: TTestKind;const useActualMeasImage:boolean);
 const
   cICalib: array [TIRange] of TCalibBasicItem = ( HG40I1uA, HG40I100uA, HG40I10mA );
 
@@ -2951,15 +3299,20 @@ var
   ix: Double;
   cr: Boolean;
   ci: TCalibBasicItem;
-  n:  Integer;
-  i:  Integer;
+//  n:  Integer;
+//  i:  Integer;
+  ts: TTestStatus;
   
 begin
+
+//  log.event('CommThreadIS1885L','doProcessReadings','started');
   if (not (aTestKind in [tkI6_InsulationTest, tkH6_HighVoltageTest])) then exit;
 
+  ts := self.fTestStatus[aTestKind];
   with self.fTestStatus[aTestKind] do
   begin
          if (Finishing)                                     then TestPhase := tpFinishing
+    else if (Discharging)                                   then TestPhase := tpDischarging
     else if (self.fTimeLastRead <= self.fTimeWaitVoltStart) then TestPhase := tpWaitVolt
     else if (self.fTimeLastRead <= self.fTimeRampUpEnd)     then TestPhase := tpRampUp
     else if (self.fTimeLastRead >= self.fTimeRampDnStart)   then TestPhase := tpRampDown
@@ -2990,6 +3343,60 @@ begin
         else      ix := cIrangeReadMult_10mA;
       end;
 
+      // TODO: Voltage, Current, Resistance and USense processing from 0x2020-0x2027 registers on firmware V01 and later
+      // based on email of WLang 2021/11/03
+      if (useActualMeasImage) then begin
+
+//        log.event('commThreadIS1885L','doProcessreading',Format('Using new method - image values: %4x,%4x; %4x,%4; %4x,%4x; %4x, %4x',
+//           [
+//             fActualMeasImage[AddrSpec_ActualMeas_min],fActualMeasImage[AddrSpec_ActualMeas_min+1],
+//             fActualMeasImage[AddrSpec_ActualMeas_min+2],fActualMeasImage[AddrSpec_ActualMeas_min+3],
+//             fActualMeasImage[AddrSpec_ActualMeas_min+4],fActualMeasImage[AddrSpec_ActualMeas_min+5],
+//             fActualMeasImage[AddrSpec_ActualMeas_min+6],fActualMeasImage[AddrSpec_ActualMeas_min+7]
+//           ]
+//        ));
+//        // ReadI - raw value
+        // ConvI - corrected by calibration             cardinal
+        // LastI - last measured value
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image');
+        ConvI := dw2Single(fActualMeasImage[AddrSpec_ActualI], fActualMeasImage[AddrSpec_ActualI+1 ]);
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image / after ConvI');
+
+        ConvU := dw2Single(fActualMeasImage[AddrSpec_ActualU], fActualMeasImage[AddrSpec_ActualU+1 ]);
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image / after ConvU');
+
+//        if (not IsZero(readI)) then begin
+          ConvR := dw2Single(fActualMeasImage[AddrSpec_ActualR], fActualMeasImage[AddrSpec_ActualR+1 ]);
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image / after convR: ' + IntToHex(fActualMeasImage[AddrSpec_ActualR],8)+' '+IntToHex(fActualMeasImage[AddrSpec_ActualR+1],8) + ',' + FloatToStr(rangeRMax)+','+FloatToStr(ConvR));
+          FlagOL := false;
+//          end;
+        if (rangeRmax > 0) and (not IsNan(ConvR)) and (ConvR > RangeRMax) then begin   // handle overrange flag based on measured resistance
+          ConvR := RangeRmax;
+          FlagOL := true;
+        end;
+
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image / before ConvUsense: ' + IntToHex(fActualMeasImage[AddrSpec_ActualUsense],8)+' '+IntToHex(fActualMeasImage[AddrSpec_ActualUsense+1],8));
+        ConvUsense := dw2Single(fActualMeasImage[AddrSpec_ActualUsense], fActualMeasImage[AddrSpec_ActualUsense+1 ]);
+//       log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image / after ConvUsense');
+
+        { Keep there last measured values from the test time }
+        if (TestPhase in [tpWaitVolt, tpRampUp, tpTest]) then
+        begin
+          LastUsense := ConvUsense;
+          LastU := ConvU;
+          LastI := ConvI;
+          LastR := ConvR;
+          LastOL := FlagOL;
+        end;
+
+        AvgConvR := ConvR;  // to be sure that averaging result somewhere is properly used - taken directly from IS
+        AvgConvU := ConvU;
+        AvgConvI := ConvI;
+
+//         log.event('CommThreadIS1885L','doProcessReadings','updating using actual process image finished');
+      end
+
+      else begin
       { Analog inputs processing }
       dw := 0;
       w := self.fInputImage[AddrRng_InImg_HG40I_Max];
@@ -3004,7 +3411,7 @@ begin
       ReadI := dw;  // 24b value of current measurement
       x := ix * cScale24bReadMult * di;
       ci := cICalib[ReadIrange];
-      ConvI := (x - self.fCalibOffset[ci]) * fCalibFactor[ci];
+      ConvI := (x - self.fCalibOffset[ci]) * self.fCalibFactor[ci];
       if (ConvI < 0.0) then ConvI := 0.0;
 
       dw := 0;
@@ -3020,33 +3427,34 @@ begin
       ReadU := dw;  // 24b value of voltage measurement 
       x := cUrangeReadMult * cScale24bReadMult * di;
       ci := HG40U;
-      ConvU := (x - self.fCalibOffset[ci]) * fCalibFactor[ci];
+      ConvU := (x - self.fCalibOffset[ci]) * self.fCalibFactor[ci];
       if (ConvU < 0.0) then ConvU := 0.0;
 
       w := self.fInputImage[T_IS1885L.AINr2Addr(AlogIn_IHV)];
       ReadI_BK := w shl 8; // 16b value of current measurement treated as 24b
       x := cIrangeReadMult_10mA * cScale24bReadMult * dw; { as stated fixed 10 mA current range on AI2 }
       ci := BKIReal;
-      ConvI_BK := (x - self.fCalibOffset[ci]) * fCalibFactor[ci];
+      ConvI_BK := (x - self.fCalibOffset[ci]) * self.fCalibFactor[ci];
       if (ConvI_BK < 0.0) then ConvI_BK := 0.0;
 
       w := self.fInputImage[T_IS1885L.AINr2Addr(AlogIn_UHV)];
       ReadU_BK := w shl 8; // 16b value of voltage measurement treated as 24b   
       x := cUrangeReadMult * cScale24bReadMult * dw;
       ci := BKUReal;
-      ConvU_BK := (x - self.fCalibOffset[ci]) * fCalibFactor[ci];
+      ConvU_BK := (x - self.fCalibOffset[ci]) * self.fCalibFactor[ci];
       if (ConvU_BK < 0.0) then ConvU_BK := 0.0;
 
       w := self.fInputImage[T_IS1885L.AINr2Addr(AlogIn_TRMS_Usense)];
       ReadUsense := w;  // 16b value of sense voltage (connected to TRMS output of U40)
       x := cUrangeReadMult * cScale16bReadMult * w;
       ci := Usense;
-      ConvUsense := (x - self.fCalibOffset[ci]) * fCalibFactor[ci];
+      ConvUsense := (x - self.fCalibOffset[ci]) * self.fCalibFactor[ci];
       if (ConvUsense < 0.0) then ConvUsense := 0.0;
 
+      (*  // TK 2023-01-26 disabled, to be sure
       { Iteration of averaging algorithm }
       Inc(AvgConvRIndex);
-      if (AvgConvRIndex >= 0) then
+      if ( (aTestKind = tkI6_InsulationTest) and (AvgConvRCacheSize > 0) and (AvgConvRIndex >= 0) ) then
       begin
         n := AvgConvRIndex mod AvgConvRCacheSize;
 
@@ -3063,10 +3471,11 @@ begin
         end;
 
         if (n > 0) then
-        begin // after averaging 
+        begin // after averaging
           Inc(n);       // n contains number of elements of calculated sum
           AvgConvU := AvgConvU / n;
-          AvgConvI := AvgConvI / n;   
+          AvgConvI := AvgConvI / n;
+        end;
 
           if (IsZero(AvgConvI)) then
           begin
@@ -3079,28 +3488,37 @@ begin
             AvgFlagOL := (AvgConvR > RangeRmax);
             if (AvgFlagOL) then AvgConvR := RangeRmax;
           end;
+        *)
+
+        { Keep there last measured values from the test time }
+        if (TestPhase in [tpWaitVolt, tpRampUp, tpTest]) then
+        begin
+          LastUsense := ConvUsense;
+          LastU := AvgConvU;
+          LastI := AvgConvI;
+          LastR := AvgConvR;
+          LastOL := AvgFlagOL;
         end;
-      end
-      else
+      {end
+      else }
       begin
-        cr := (ConvI > 0.0);
-        if (cr) then
-        begin
-          ConvR := ConvU / ConvI;
-          FlagOL := (ConvR > RangeRmax);
-          if (FlagOL) then ConvR := RangeRmax;
-        end
-        else
-        begin
-          ConvR := RangeRmax;
-          FlagOL := true;
+      cr := (ConvI > 0.0);
+      if (cr) then 
+      begin 
+        ConvR := ConvU / ConvI;
+        FlagOL := (ConvR > RangeRmax);
+        if (FlagOL) then ConvR := RangeRmax;
+      end
+      else         
+      begin
+        ConvR := RangeRmax;
+        FlagOL := true;
         end;
 
         AvgConvU := 0.0;
         AvgConvI := 0.0;
         AvgConvR := ConvR;
         AvgFlagOL := FlagOL;
-      end;
 
       { Keep there last measured values from the test time }
       if (TestPhase in [tpWaitVolt, tpRampUp, tpTest]) then
@@ -3111,7 +3529,8 @@ begin
         LastR := ConvR;
         LastOL := FlagOL;
       end;
-
+      end;
+      end;  // read using actualMeasurement image or analogs and averaging
 {$ifdef MIN_MAX}
       if (TestPhase = tpTest) then
       begin
@@ -3153,6 +3572,8 @@ begin
 {$endif}
     end;
   end;
+  ts := self.fTestStatus[aTestKind];  // This is small hack to be able to debug optimized code!!!
+//  log.event('CommThreadIS1885L','doProcessReadings','finished');
 end; 
 
 
@@ -3183,6 +3604,7 @@ begin
     ReadyToStart        := false;                          
     Finishing           := false;
     Finished            := false;
+    Discharging         := false;
     ErrorCode           := 0;
     ElapsedTime         := 0;
     TestPhase           := tpIdle;
@@ -3293,9 +3715,12 @@ begin
   try
     if (self.fModbusClient.WriteCoil(aRegNo, aValue)) then
       result := OK
+    else if  fLastCommErr.errCode=4 then
+     result := ErrorMBWatchdog
     else
       result := ErrorCommunication;
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end;
 
@@ -3308,9 +3733,12 @@ begin
   try
     if (self.fModbusClient.WriteCoils(aRegNo, aBlocks, aRegisterData)) then
       result := OK
+    else if  fLastCommErr.errCode=4 then
+     result := ErrorMBWatchdog
     else
       result := ErrorCommunication;
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end;
 
@@ -3326,6 +3754,7 @@ begin
     else
       result := ErrorCommunication;
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end; 
 
@@ -3338,9 +3767,13 @@ begin
   try
     if (self.fModbusClient.WriteRegister(aRegNo, aValue)) then
       result := OK
+    else if  fLastCommErr.errCode=4 then
+     result := ErrorMBWatchdog
     else
       result := ErrorCommunication;
+    log.event(STACK_LEVEL, Format('register write at @%x value %x, success: %s', [aRegNo, aValue, BoolToStr(result = OK, TRUE)]), logLevel_Verbose);
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end; 
 
@@ -3349,13 +3782,29 @@ end;
 
 
 function TCommThreadIS1885L.writeRegisters(const aRegNo: Word; const aBlocks: Word; const aRegisterData: array of Word): TRetVal;
+var
+  i: Integer;
+  logLine: AnsiString;
 begin
   try
     if (self.fModbusClient.WriteRegisters(aRegNo, aBlocks, aRegisterData)) then
       result := OK
+    else if  fLastCommErr.errCode=4 then
+     result := ErrorMBWatchdog
     else
       result := ErrorCommunication;
+    logLine := Format('registers write at @%x, #%d blocks', [aRegNo, aBlocks]);
+    if (Length(aRegisterData) > 0) then
+    begin
+      logLine := logLine + Format(', values: [%x', [aRegisterData[Low(aRegisterData)]]);
+      for i:= Low(aRegisterData)+1 to High(aRegisterData) do
+        logLine := logLine + Format(', %x', [aRegisterData[i]]);
+      logLine := logLine + '] ';
+    end;
+    logLine := logLine + Format('success: %s', [BoolToStr(result = OK, TRUE)]);
+    log.event(STACK_LEVEL, logLine, logLevel_Verbose);
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end; 
 
@@ -3370,7 +3819,9 @@ begin
       result := OK
     else
       result := ErrorCommunication;
+    log.event(STACK_LEVEL, Format('regRead at @%x value %x, success: %s', [aRegNo, aValue, BoolToStr(result = OK, TRUE)]), logLevel_Verbose);
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end; 
 
@@ -3386,6 +3837,7 @@ begin
     else
       result := ErrorCommunication;
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
   end; 
 
@@ -3433,8 +3885,9 @@ begin
     end;
         
   except
+    self.fConnected := self.fModbusClient.Connected; //copy connection state
     result := ErrorCommunication;
-
+    if self.fConnected then
     self.writeRegister(CB, $00);
   end; 
 
@@ -3474,6 +3927,7 @@ begin
     begin
       try
         b := self.fModbusClient.WriteDWord(CB, dw);
+        log.event(STACK_LEVEL, Format('DWord write at @%x value %x, passed: %s', [CB, dw, BoolToStr(b, TRUE)]));
       except
         b := false;
       end
@@ -3509,7 +3963,7 @@ function TCommThreadIS1885L.rampProg(const aAddr: Word; const aUstart, aRampTime
 var          
 //  b:    Boolean;
   w:    Word;
-  lw:   Word;
+//  lw:   Word;
 {$endif}
 
 begin
@@ -3545,6 +3999,7 @@ begin
 //  end;
                            
   result := OK;
+  log.event(STACK_LEVEL, 'preparing ramp in function', logLevel_Verbose);
   
   { Program start voltage }
   w := Trunc(aUstart * cScale16bWriteMult * cUrangeWriteMult);
@@ -3552,7 +4007,7 @@ begin
   if (result = OK) then result := self.regCommWrite(aAddr, RegNr_Ustart, w);
   if (result = OK) then result := self.regCommRead(aAddr, RegNr_Ustart, w);
 
-  lw := w;  { TODO: Process read values or not?! }
+//  lw := w;  { TODO: Process read values or not?! }
 
   { Program ramp time }
   w := Trunc(aRampTime * 100.0); { 1x s => 10x ms }
@@ -3760,6 +4215,8 @@ end;
 function  T_IS1885L.getCalibValue(ValIndex: TCalibrationParam): Double;
 begin
   Result := self.fCalibrationData[Ord(ValIndex)];
+//  if IsNan(Result) then
+//    if Ord(ValIndex) mod 2 = 0 then  Result:=1 else Result:=0;
 end;
 
 
@@ -3791,7 +4248,7 @@ begin
   TCommThreadIS1885L(self.fThread).passWriteMultiRegs(2, aArray);
 
   result := basicThreadAction(self.fThread, cAction, self.fCommTout, AddrSpec_Cal_Data+2*Ord(ValIndex), dummy);
-end;  
+end;
 
 
 procedure T_IS1885L.clearAllCalibData;
@@ -3813,7 +4270,7 @@ end;
 function T_IS1885L.readAllCalibData (aContinueOnError: Boolean = true): TRetVal;
 var
   dummy: Single;
-
+  dummytime:TSystemTime;
 begin
   result := self.readCalibValue(HG40I10mAFact, dummy);
   if ( (result <> OK) and (not aContinueOnError) ) then exit;
@@ -3821,7 +4278,7 @@ begin
   result := self.readCalibValue(HG40I100uAFact, dummy);
   if ( (result <> OK) and (not aContinueOnError) ) then exit;
 
-  result := self.readCalibValue(HG40I1uAFact, dummy);  
+  result := self.readCalibValue(HG40I1uAFact, dummy);
   if ( (result <> OK) and (not aContinueOnError) ) then exit;
 
   result := self.readCalibValue(HG40UFact, dummy);   
@@ -3860,7 +4317,26 @@ begin
   result := self.readCalibValue(UsenseFact, dummy);
   if ( (result <> OK) and (not aContinueOnError) ) then exit;
 
-  result := self.readCalibValue(UsenseOff, dummy);  
+  result := self.readCalibValue(UsenseOff, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+
+  result := self.readCalibValue(BKUNomRange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(BKURealRange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(BKIRealRange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(HG40I1uARange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(HG40I100uARange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(HG40I10mARange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(HG40URange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibValue(UsenseRange, dummy);
+  if ( (result <> OK) and (not aContinueOnError) ) then exit;
+  result := self.readCalibTime(dummytime);//calibration date is other format.
 //  if ( (result <> OK) and (not aContinueOnError) ) then exit;
 end;  
 
@@ -3874,27 +4350,35 @@ begin
 
     fCalibFactor[BKUNom] := self.fCalibrationData[Ord(BKUNomFact)];
     fCalibOffset[BKUNom] := self.fCalibrationData[Ord(BKUNomOff)];
-    
+    fCalibRange[BKUNom] := self.fCalibrationData[Ord(BKUNomRange)];
+
     fCalibFactor[BKUReal] := self.fCalibrationData[Ord(BKURealFact)];
     fCalibOffset[BKUReal] := self.fCalibrationData[Ord(BKURealOff)];
-    
+    fCalibRange[BKUReal]  := self.fCalibrationData[Ord(BKURealRange)];
+
     fCalibFactor[BKIReal] := self.fCalibrationData[Ord(BKIRealFact)];
     fCalibOffset[BKIReal] := self.fCalibrationData[Ord(BKIRealOff)];
+    fCalibRange[BKIReal] := self.fCalibrationData[Ord(BKIRealRange)];
 
     fCalibFactor[HG40I1uA] := self.fCalibrationData[Ord(HG40I1uAFact)];
     fCalibOffset[HG40I1uA] := self.fCalibrationData[Ord(HG40I1uAOff)];
+    fCalibRange[HG40I1uA]  := self.fCalibrationData[Ord(HG40I1uARange)];
 
     fCalibFactor[HG40I100uA] := self.fCalibrationData[Ord(HG40I100uAFact)];
     fCalibOffset[HG40I100uA] := self.fCalibrationData[Ord(HG40I100uAOff)];
+    fCalibRange[HG40I100uA]  := self.fCalibrationData[Ord(HG40I100uARange)];
 
     fCalibFactor[HG40I10mA] := self.fCalibrationData[Ord(HG40I10mAFact)];
     fCalibOffset[HG40I10mA] := self.fCalibrationData[Ord(HG40I10mAOff)];
+    fCalibRange[HG40I10mA]  := self.fCalibrationData[Ord(HG40I10mARange)];
 
     fCalibFactor[HG40U] := self.fCalibrationData[Ord(HG40UFact)];
     fCalibOffset[HG40U] := self.fCalibrationData[Ord(HG40UOff)];
+    fCalibRange[HG40U]  := self.fCalibrationData[Ord(HG40URange)];
 
     fCalibFactor[Usense] := self.fCalibrationData[Ord(UsenseFact)];
     fCalibOffset[Usense] := self.fCalibrationData[Ord(UsenseOff)];
+    fCalibRange[Usense]  := self.fCalibrationData[Ord(UsenseRange)];
   end;
 end;
 
@@ -3917,13 +4401,75 @@ begin
   if (result <> OK) then exit;
 
   TCommThreadIS1885L(self.fThread).fetchMultiRegs(2, aArray);
-  
+
   LongRec(Value).Lo := aArray[0];
   LongRec(Value).Hi := aArray[1];
 
   self.fCalibrationData[Ord(ValIndex)] := Value;  { implicit typecast from Single (NV memory) to Double (RAM) }
 end;
 
+function  T_IS1885L.writeCalibTime(Time:TSystemTime):TRetVal;
+const
+  cAction: TAction = actWriteMultiRegs;
+
+var
+  dummy:  Word;
+  aArray: array [0 .. 1] of Word;
+  DateTime: TFileTime;
+
+begin
+  result := self.checkPrologue;
+  if (result <> OK) then exit;
+
+  if not SystemTimeToFileTime(Time,DateTime) then
+    result:= ErrorGeneral;
+  if not FileTimeToDosDateTime(DateTime,aArray[1],aArray[0]) then
+    result:= ErrorGeneral;
+  if (result <> OK) then exit;
+  fCalibrationDate:=aArray[1];
+  fCalibrationTime:=aArray[0];
+
+  TCommThreadIS1885L(self.fThread).passWriteMultiRegs(2, aArray);
+
+  result := basicThreadAction(self.fThread, cAction, self.fCommTout, AddrSpec_Cal_Data+2*Ord(CalibrationDate), dummy);
+end;
+
+function  T_IS1885L.readCalibTime(var Time:TSystemTime):TRetVal;
+const
+  cAction: TAction = actReadMultiRegs;
+
+var
+  w:  Word;
+  aArray: array [0 .. 1] of Word;
+  DateTime: TFileTime;
+begin
+  result := self.checkPrologue;
+  if (result <> OK) then exit;
+
+  w := 2;
+
+  result := basicThreadAction(self.fThread, cAction, self.fCommTout, AddrSpec_Cal_Data+2*Ord(CalibrationDate), w);
+  if (result <> OK) then exit;
+
+  TCommThreadIS1885L(self.fThread).fetchMultiRegs(2, aArray);
+  if not DosDateTimeToFileTime(aArray[1],aArray[0],DateTime) then result:=ErrorGeneral;
+  if not FileTimeToSystemTime(DateTime,Time) then result:=ErrorGeneral;
+  fCalibrationDate:=aArray[1];
+  fCalibrationTime:=aArray[0];
+end;
+
+function  T_IS1885L.getCalibTime:TSystemTime;
+var
+  DateTime: TFileTime;
+begin
+ DosDateTimeToFileTime(fCalibrationDate,fCalibrationTime,DateTime);
+ FileTimeToSystemTime(DateTime,Result);
+end;
+
+  Function T_IS1885L.GetConnected:Boolean;
+  begin
+    Result:=  (self.fThread <> nil) and TCommThreadIS1885L(self.fThread).isConnected;
+  end;
 
 INITIALIZATION
   is1885lObj := nil;

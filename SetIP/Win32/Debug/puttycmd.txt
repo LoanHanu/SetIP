@@ -1,1 +1,1 @@
-sudo reboot
+cat /etc/network/interfaces

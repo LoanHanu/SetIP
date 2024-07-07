@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'MainForm'
-  ClientHeight = 561
-  ClientWidth = 793
+  ClientHeight = 562
+  ClientWidth = 765
   Color = clBtnFace
   Constraints.MinHeight = 600
   Constraints.MinWidth = 400
@@ -33,25 +33,31 @@ object MainForm: TMainForm
   object PageControl: TPageControl
     Left = 0
     Top = 0
-    Width = 793
-    Height = 561
+    Width = 765
+    Height = 562
     ActivePage = SheetIO40
     Align = alClient
     TabOrder = 0
     OnChange = PageControlChange
+    ExplicitWidth = 761
+    ExplicitHeight = 561
     object SheetTR40: TTabSheet
       Caption = 'TR40'
       DesignSize = (
-        785
-        531)
+        757
+        532)
       object GroupBox1: TGroupBox
         Left = 3
         Top = 3
-        Width = 779
+        Width = 751
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
+        ExplicitWidth = 747
+        DesignSize = (
+          751
+          54)
         object Label1: TLabel
           AlignWithMargins = True
           Left = 5
@@ -72,6 +78,31 @@ object MainForm: TMainForm
           Height = 24
           Center = True
           Transparent = True
+        end
+        object ImageIsTR40: TImage
+          Left = 457
+          Top = 20
+          Width = 24
+          Height = 24
+          Center = True
+          Transparent = True
+          Visible = False
+        end
+        object Label16: TLabel
+          Left = 410
+          Top = 24
+          Width = 41
+          Height = 15
+          Caption = 'Is TR40?'
+          Visible = False
+        end
+        object Label18: TLabel
+          Left = 487
+          Top = 24
+          Width = 69
+          Height = 15
+          Caption = 'Mac address:'
+          Visible = False
         end
         object ButtonTR40Ping: TButton
           AlignWithMargins = True
@@ -122,6 +153,8 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '1'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
           end
           object EditTR40CurrIPDot3: TEdit
             AlignWithMargins = True
@@ -165,6 +198,8 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 3
             Text = '1'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
           end
           object EditTR40CurrIPDot2: TEdit
             AlignWithMargins = True
@@ -208,6 +243,9 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 2
             Text = '168'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
+            OnKeyPress = OctetKeyPress
           end
           object EditTR40CurrIPDot1: TEdit
             AlignWithMargins = True
@@ -251,17 +289,32 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 1
             Text = '192'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
+            OnKeyPress = OctetKeyPress
           end
+        end
+        object EditTR40MacAddr: TEdit
+          Left = 550
+          Top = 20
+          Width = 198
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 2
+          Visible = False
+          ExplicitLeft = 546
         end
       end
       object GroupBox2: TGroupBox
         Left = 3
         Top = 279
-        Width = 779
+        Width = 751
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
         TabOrder = 1
+        ExplicitWidth = 747
         object Label2: TLabel
           AlignWithMargins = True
           Left = 5
@@ -338,6 +391,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '1'
+            OnChange = OctetChange
           end
           object Edit2: TEdit
             AlignWithMargins = True
@@ -381,6 +435,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 3
             Text = '1'
+            OnChange = OctetChange
           end
           object Edit4: TEdit
             AlignWithMargins = True
@@ -424,6 +479,8 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 2
             Text = '168'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
           end
           object Edit6: TEdit
             AlignWithMargins = True
@@ -467,6 +524,8 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 1
             Text = '192'
+            OnChange = OctetChange
+            OnExit = OctetEditExit
           end
         end
         object Panel3: TPanel
@@ -498,6 +557,7 @@ object MainForm: TMainForm
             ReadOnly = True
             TabOrder = 4
             Text = '0'
+            OnChange = OctetChange
           end
           object Edit9: TEdit
             AlignWithMargins = True
@@ -542,6 +602,7 @@ object MainForm: TMainForm
             ReadOnly = True
             TabOrder = 3
             Text = '255'
+            OnChange = OctetChange
           end
           object Edit11: TEdit
             AlignWithMargins = True
@@ -586,6 +647,7 @@ object MainForm: TMainForm
             ReadOnly = True
             TabOrder = 2
             Text = '255'
+            OnChange = OctetChange
           end
           object Edit13: TEdit
             AlignWithMargins = True
@@ -630,6 +692,7 @@ object MainForm: TMainForm
             ReadOnly = True
             TabOrder = 1
             Text = '255'
+            OnChange = OctetChange
           end
         end
         object Panel4: TPanel
@@ -662,6 +725,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 4
             Text = '0'
+            OnChange = OctetChange
           end
           object Edit16: TEdit
             AlignWithMargins = True
@@ -705,6 +769,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 3
             Text = '1'
+            OnChange = OctetChange
           end
           object Edit18: TEdit
             AlignWithMargins = True
@@ -748,6 +813,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 2
             Text = '168'
+            OnChange = OctetChange
           end
           object Edit20: TEdit
             AlignWithMargins = True
@@ -791,6 +857,7 @@ object MainForm: TMainForm
             ParentFont = False
             TabOrder = 1
             Text = '192'
+            OnChange = OctetChange
           end
         end
         object ButtonTR40ChangeIP: TButton
@@ -818,11 +885,15 @@ object MainForm: TMainForm
       object GroupBox5: TGroupBox
         Left = 3
         Top = 63
-        Width = 779
+        Width = 751
         Height = 210
         Anchors = [akLeft, akTop, akRight]
         Caption = 'SSH Connection'
         TabOrder = 2
+        ExplicitWidth = 747
+        DesignSize = (
+          751
+          210)
         object Label10: TLabel
           Left = 3
           Top = 16
@@ -859,18 +930,20 @@ object MainForm: TMainForm
           Caption = 'Password:'
         end
         object Label15: TLabel
-          Left = 392
+          Left = 379
           Top = 16
           Width = 198
           Height = 15
           Caption = 'Output(the case of caching host key):'
         end
         object Label17: TLabel
-          Left = 392
-          Top = 180
+          Left = 363
+          Top = 175
           Width = 34
           Height = 15
+          Anchors = [akTop, akRight]
           Caption = 'Input: '
+          ExplicitLeft = 375
         end
         object LabelTR40ConnectionState: TLabel
           Left = 264
@@ -965,31 +1038,37 @@ object MainForm: TMainForm
           OnRightButtonClick = EditTR40PassRightButtonClick
         end
         object MemoTR40Output: TMemo
-          Left = 392
+          Left = 367
           Top = 37
-          Width = 385
+          Width = 381
           Height = 132
+          Anchors = [akTop, akRight]
           ReadOnly = True
           ScrollBars = ssBoth
           TabOrder = 8
+          ExplicitLeft = 363
         end
         object EditTR40Input: TEdit
-          Left = 439
-          Top = 176
+          Left = 403
+          Top = 175
           Width = 257
           Height = 23
+          Anchors = [akTop, akRight]
           Enabled = False
           TabOrder = 9
+          ExplicitLeft = 399
         end
         object ButtonTR40Input: TButton
-          Left = 702
+          Left = 673
           Top = 175
           Width = 75
           Height = 25
+          Anchors = [akTop, akRight]
           Caption = 'Input'
           Enabled = False
           TabOrder = 10
           OnClick = ButtonTR40InputClick
+          ExplicitLeft = 669
         end
         object ButtonTR40SshDisconnect: TButton
           Left = 153
@@ -1007,16 +1086,19 @@ object MainForm: TMainForm
       Caption = 'IO40'
       ImageIndex = 1
       DesignSize = (
-        785
-        531)
+        757
+        532)
       object GroupBox3: TGroupBox
         Left = 3
-        Top = 114
-        Width = 770
+        Top = 3
+        Width = 751
         Height = 54
         Anchors = [akLeft, akTop, akRight]
         Caption = 'Origin IP...'
         TabOrder = 0
+        DesignSize = (
+          751
+          54)
         object Label6: TLabel
           AlignWithMargins = True
           Left = 5
@@ -1031,16 +1113,38 @@ object MainForm: TMainForm
           Caption = 'Current IP: '
         end
         object ImageIO40PingLed: TImage
-          Left = 361
+          Left = 340
           Top = 20
           Width = 24
           Height = 24
           Center = True
           Transparent = True
         end
+        object Label19: TLabel
+          Left = 411
+          Top = 24
+          Width = 40
+          Height = 15
+          Caption = 'Is IO40?'
+        end
+        object ImageIsIO40: TImage
+          Left = 457
+          Top = 20
+          Width = 24
+          Height = 24
+          Center = True
+          Transparent = True
+        end
+        object Label20: TLabel
+          Left = 487
+          Top = 24
+          Width = 69
+          Height = 15
+          Caption = 'Mac address:'
+        end
         object ButtonIO40Ping: TButton
           AlignWithMargins = True
-          Left = 275
+          Left = 254
           Top = 20
           Width = 80
           Height = 25
@@ -1218,11 +1322,20 @@ object MainForm: TMainForm
             Text = '192'
           end
         end
+        object EditIO40MacAddr: TEdit
+          Left = 550
+          Top = 20
+          Width = 198
+          Height = 23
+          Anchors = [akTop, akRight]
+          ReadOnly = True
+          TabOrder = 2
+        end
       end
       object GroupBox4: TGroupBox
         Left = 3
         Top = 174
-        Width = 770
+        Width = 751
         Height = 138
         Anchors = [akLeft, akTop, akRight]
         Caption = 'New IP...'
@@ -1777,11 +1890,15 @@ object MainForm: TMainForm
       end
       object GroupBox7: TGroupBox
         Left = 3
-        Top = 3
-        Width = 806
+        Top = 63
+        Width = 751
         Height = 105
+        Anchors = [akLeft, akTop, akRight]
         Caption = 'Set IP on MAC'
         TabOrder = 2
+        DesignSize = (
+          751
+          105)
         object Label25: TLabel
           Left = 3
           Top = 24
@@ -1831,10 +1948,11 @@ object MainForm: TMainForm
           OnClick = ButtonIO40SetIPClick
         end
         object MemoIO40State: TMemo
-          Left = 336
+          Left = 343
           Top = 16
-          Width = 441
+          Width = 392
           Height = 86
+          Anchors = [akTop, akRight]
           Lines.Strings = (
             'MemoIO40State')
           TabOrder = 4

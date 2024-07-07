@@ -233,9 +233,9 @@ var
   netInterface, netConfigFileName: string;
   Lines, fields, names: TArray<string>;
   line, name, ext, section: string;
-  cmd: string;
+  cmd, cmdLine: string;
   i: integer;
-  netConfigContents: TStringList;
+  netConfigContents, output: TStringList;
 begin
   res := False;
   if Self.FIsConnected then
@@ -248,7 +248,7 @@ begin
       cmdResult := ExecuteCommand('ifconfig');
       cmdResult := cmdResult.Trim;
 
-      // cmdResult := ExecuteCommand('nmcli device status');
+      // cmdResult := ExecuteCommand('nmcli device status'); // do not work in embedded linux
       // cmdResult := cmdResult.Trim;
 
       if cmdResult.Contains(#13#10) then
@@ -314,58 +314,145 @@ begin
 
       // the case of that 'sudo sed' not working
       // read net interface file
-      netConfigFileName := '/etc/network/interfaces';
-      cmd := 'sudo cat /etc/network/interfaces';
-      cmdResult := ExecuteCommand(cmd);
-      cmdResult := cmdResult.Trim;
-
-      if cmdResult.Contains(#13#10) then
-      begin
-        Lines := cmdResult.Split([#13#10]);
-      end
-      else if cmdResult.Contains(#10) then
-      begin
-        Lines := cmdResult.Split([#10]);
-      end;
-
-      section := Format('auto %s', [netInterface]);
-      if Length(Lines) > 0 then
-      begin
-        i := 0; // index of line
-        for line in Lines do
-        begin
-          if line.Trim = section then
-          begin
-            break;
-          end
-          else
-            i := i + 1;
-        end;
-
-        i := i + 2;
-        line := Lines[i]; // get address line
-        section := Format('address %s', [Self.FHostIP]);
-        if line.Trim = section then
-        begin
-          line := line.Replace(Format('address %s', [Self.FHostIP]), Format('address %s', [newIP]));
-          Lines[i] := line;
-        end;
-
-      end;
-
-      netConfigContents := TStringList.Create;
-      netConfigContents.AddStrings(Lines);
-
-      // run net config command to change with new ip address
-      cmd := Format('echo "%s" | sudo tee %s', [netConfigContents.Text, netConfigFileName]);
-      cmdResult := Self.ExecuteCommand(cmd);
-
-      // sudo sed -i '/^auto eth0/,/^$/s/address 192.168.1.100/address 192.168.1.200/' /etc/network/interfaces
-      // cmd := Format('sudo sed -i "/^auto %s/,/^$/s/address %s/address %s/" /etc/network/interfaces', [netInterface, Self.FHostName, newIP]);
+      // netConfigFileName := '/etc/network/interfaces';
+      // cmd := 'cat /etc/network/interfaces';
       // cmdResult := ExecuteCommand(cmd);
+      // cmdResult := cmdResult.Trim;
+      //
+      // if cmdResult.Contains(#13#10) then
+      // begin
+      // Lines := cmdResult.Split([#13#10]);
+      // end
+      // else if cmdResult.Contains(#10) then
+      // begin
+      // Lines := cmdResult.Split([#10]);
+      // end;
+      //
+      // section := Format('auto %s', [netInterface]);
+      // if Length(Lines) > 0 then
+      // begin
+      // i := 0; // index of line
+      // for line in Lines do
+      // begin
+      // if line.Trim = section then
+      // begin
+      // break;
+      // end
+      // else
+      // i := i + 1;
+      // end;
+      //
+      // i := i + 2;
+      // if i < Length(Lines) then
+      // begin
+      // line := Lines[i]; // get address line
+      // section := Format('address %s', [Self.FHostIP]);
+      // if line.Trim = section then
+      // begin
+      // line := line.Replace(Format('address %s', [Self.FHostIP]), Format('address %s', [newIP]));
+      // Lines[i] := line;
+      // end;
+      // end
+      // else // error case
+      // begin
+      // //
+      // res := False;
+      // Result := res;
+      // Exit;
+      // end;
+      //
+      // end;
+      //
+      // netConfigContents := TStringList.Create;
+      // netConfigContents.AddStrings(Lines);
+      //
+      // // run net config command to change with new ip address
+      // cmd := Format('echo "%s" | sudo tee %s', [netConfigContents.Text, netConfigFileName]);
+      // cmdResult := Self.ExecuteCommand(cmd);
 
-      // read net interface file
-      cmd := 'sudo cat /etc/network/interfaces';
+      {
+        // sudo sed -i '/^auto eth0/,/^$/s/address 192.168.1.100/address 192.168.1.200/' /etc/network/interfaces
+        // sudo sed -i '/^auto eth0/,/^$/s/address 192.168.1.100/address 192.168.1.200/' /etc/network/interfaces
+        // cmd := Format('sudo sed -i "/^auto %s/,/^$/s/address %s/address %s/" /etc/network/interfaces', [netInterface, Self.FHostIP, newIP]);
+      }
+      cmd := Format('sed -i ''s/%s/%s/'' /etc/network/interfaces', [Self.FHostIP, newIP]);
+      cmdResult := ExecuteCommand(cmd);
+
+      {
+        sudo chmod 666 /etc/network/interfaces : change permission for read/write
+        sudo chmod 644 /etc/network/interfaces : revert permission
+        ls -l /etc/network/interfaces: check permission
+        pscp -pw ubuntu ubuntu@10.99.4.25:/etc/network/interfaces interfaces : download the file 'interfaces' from ssh server
+        pscp -pw ubuntu interfaces ubuntu@10.99.4.25:/etc/network/interfaces : copy the local file to ssh server by replacing
+      }
+      {
+        // cmdResult := ExecuteCommand('ls -l /etc/network/interfaces');
+        // cmdResult := ExecuteCommand('chmod 666 /etc/network/interfaces');
+        // cmdResult := ExecuteCommand('ls -l /etc/network/interfaces');
+        //
+        // // make backup of file 'interfaces'
+        // cmdResult := ExecuteCommand('cp /etc/network/interfaces /etc/network/interfaces.bak');
+        //
+        // // download...
+        // cmdLine := Format('pscp.lib -pw %s %s@%s:/etc/network/interfaces netinterfaces.dat', [Self.FPassword, Self.FUser, Self.FHostIP]);
+        // output := TStringList.Create;
+        // ExecuteCommandLine(cmdLine, output);
+        // cmdResult := output.Text;
+        // output.Free;
+        //
+        // // read interfaces and replace with new ip
+        // netConfigContents := TStringList.Create;
+        // netConfigContents.LoadFromFile('netinterfaces.dat');
+        //
+        // if netConfigContents.Count > 0 then
+        // begin
+        // section := Format('auto %s', [netInterface]);
+        // i := 0;
+        // for line in netConfigContents do
+        // begin
+        // if line.Trim = section then
+        // begin
+        // break;
+        // end
+        // else
+        // begin
+        // i := i + 1;
+        // end;
+        // end;
+        //
+        // i := i + 2;
+        // if i < netConfigContents.Count then
+        // begin
+        // line := netConfigContents[i];
+        // section := Format('address %s', [Self.FHostIP]);
+        // if line.Trim = section then
+        // begin
+        // line := line.Replace(Format('address %s', [Self.FHostIP]), Format('address %s', [newIP]));
+        // netConfigContents[i] := line;
+        // netConfigContents.SaveToFile('netinterfaces.dat');
+        // netConfigContents.Free;
+        // end;
+        // end
+        // else
+        // begin
+        // Result := False;
+        // Exit;
+        // end;
+        //
+        // // upload...
+        // cmdline := Format('pscp.lib -pw %s netinterfaces.dat %s@%s:/etc/network/interfaces', [Self.FPassword, Self.FUser, Self.FHostIP]);
+        // output := TStringList.Create;
+        // ExecuteCommandLine(cmdLine, output);
+        // cmdResult := output.Text;
+        // output.Free;
+        // end;
+        //
+        // cmdResult := ExecuteCommand('chmod 644 /etc/network/interfaces');
+        // cmdResult := ExecuteCommand('ls -l /etc/network/interfaces');
+      }
+
+      // read net interface file and check the changes
+      cmd := 'cat /etc/network/interfaces';
       cmdResult := ExecuteCommand(cmd);
       cmdResult := cmdResult.Trim;
 
@@ -393,16 +480,25 @@ begin
         end;
 
         i := i + 2;
-        line := Lines[i]; // get address line
-        section := Format('address %s', [newIP]);
-        if line.Trim = section then
+        if i < Length(Lines) then
         begin
-          res := True;
+          line := Lines[i]; // get address line
+          section := Format('address %s', [newIP]);
+          if line.Trim = section then
+          begin
+            res := True;
 
-          cmd := 'sudo reboot';
-          cmdResult := ExecuteCommand(cmd);
+            cmd := 'reboot';
+            cmdResult := ExecuteCommand(cmd);
 
-          Self.FIsConnected := False;
+            Self.FIsConnected := False;
+          end;
+        end
+        else
+        begin
+          res := False;
+          Result := res;
+          Exit;
         end;
 
       end;

@@ -112,12 +112,14 @@
         <DCCReference Include="Service\libssh2\SocketUtils.pas"/>
         <DCCReference Include="Service\uLibSsh2Client.pas"/>
         <DCCReference Include="Service\winsock2\Winsock2.pas"/>
+        <DCCReference Include="Service\libssh2\libssh2.pas"/>
+        <DCCReference Include="Service\Logger\logger.pas"/>
         <DCCReference Include="Service\Modbus\IdModbusClient.pas"/>
         <DCCReference Include="Service\Modbus\ModBusConsts.pas"/>
         <DCCReference Include="Service\Modbus\ModbusTypes.pas"/>
         <DCCReference Include="Service\Modbus\ModbusUtils.pas"/>
-        <DCCReference Include="Service\libssh2\libssh2.pas"/>
         <None Include="Service\Modbus\ModBusCompiler.inc"/>
+        <None Include="Service\Modbus\ModBusPlatforms.inc"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -141,6 +143,12 @@
             </Delphi.Personality>
             <Deployment Version="4">
                 <DeployFile LocalName="Service\Modbus\ModBusCompiler.inc" Configuration="Debug" Class="ProjectFile">
+                    <Platform Name="Win32">
+                        <RemoteDir>.\</RemoteDir>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Service\Modbus\ModBusPlatforms.inc" Configuration="Debug" Class="ProjectFile">
                     <Platform Name="Win32">
                         <RemoteDir>.\</RemoteDir>
                         <Overwrite>true</Overwrite>

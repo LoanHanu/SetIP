@@ -88,15 +88,13 @@ var
   cmd, Output, ErrOutput: string;
   i, ExitCode: Integer;
   netConfigContents: TStringList;
+  section: string;
 begin
   res := False;
   if Self.FIsConnected then
   begin
     try
-      SshExec.Exec('abcdefg', cmdResult, ErrOutput, ExitCode);
-      cmdResult := cmdResult.Trim;
-
-      SshExec.Exec('nmcli device status', cmdResult, ErrOutput, ExitCode);
+      SshExec.Exec('ifconfig', cmdResult, ErrOutput, ExitCode);
       cmdResult := cmdResult.Trim;
 
       if cmdResult.Contains(#13#10) then
@@ -110,15 +108,14 @@ begin
 
       if Length(Lines) > 0 then
       begin
-        fields := Lines[0].Split([' '], TStringSplitOptions.ExcludeEmpty);
-        for i := 1 to Length(Lines) - 1 do
+        for line in Lines do
         begin
-          fields := Lines[i].Split([' '], TStringSplitOptions.ExcludeEmpty);
-          if fields[1].ToLower = 'ethernet' then
+          if line.Contains('Link encap:Ethernet') then
           begin
-            netInterface := fields[0];
+            netInterface := line.Split([' '], TStringSplitOptions.ExcludeEmpty)[0];
             break;
           end;
+
         end;
       end;
 
@@ -129,158 +126,62 @@ begin
         Exit;
       end;
 
-      // network config file:
-      // the case of modern OS(Ubuntu 17.10 or later) : /etc/netplan/*.yaml
-      // the case of old OS(traditional network): /etc/network/interfaces
-
-      netConfigContents := TStringList.Create;
-
-      // get network config file name with extension ".yaml" : ls /etc/netplan
-      netConfigFileName := '';
-      SshExec.Exec('ls /etc/netplan', cmdResult, ErrOutput, ExitCode); // 'ls: cannot access ''/etc/netplan'': No such file or directory'
+      cmd := Format('sed -i ''s/%s/%s/'' /etc/network/interfaces', [Self.FHostIP, newIP]);
+      SshExec.Exec(cmd, cmdResult, ErrOutput, ExitCode);
       cmdResult := cmdResult.Trim;
-      if cmdResult.ToLower.Contains('no such file or directory') or (cmdResult = '') then
+
+      // read net interface file and check the changes
+      cmd := 'cat /etc/network/interfaces';
+      SshExec.Exec(cmd, cmdResult, ErrOutput, ExitCode);
+      cmdResult := cmdResult.Trim;
+
+      if cmdResult.Contains(#13#10) then
       begin
-        netConfigFileName := '';
+        Lines := cmdResult.Split([#13#10]);
       end
-      else
+      else if cmdResult.Contains(#10) then
       begin
-        names := cmdResult.Split([' '], TStringSplitOptions.ExcludeEmpty);
-        for name in names do
+        Lines := cmdResult.Split([#10]);
+      end;
+
+      section := Format('auto %s', [netInterface]);
+      if Length(Lines) > 0 then
+      begin
+        i := 0; // index of line
+        for line in Lines do
         begin
-          try
-            ext := TPath.GetExtension(name).Trim;
-            if ext = '.yaml' then
-            begin
-              netConfigFileName := name;
+          if line.Trim = section then
+          begin
+            break;
+          end
+          else
+            i := i + 1;
+        end;
 
-              break;
-            end;
-          finally
+        i := i + 2;
+        if i < Length(Lines) then
+        begin
+          line := Lines[i]; // get address line
+          section := Format('address %s', [newIP]);
+          if line.Trim = section then
+          begin
+            res := True;
 
+            cmd := 'reboot';
+            SshExec.Exec(cmd, cmdResult, ErrOutput, ExitCode);
+
+            Self.FIsConnected := False;
           end;
-        end;
-      end;
-
-      if netConfigFileName <> '' then // the case of morden OS
-      begin
-        netConfigFileName := '/etc/netplan/' + netConfigFileName; // MAKE FULL PATH
-
-        { Here are some common subnet masks and their corresponding CIDR notations:
-          255.255.255.0 = /24
-          255.255.255.128 = /25
-          255.255.255.192 = /26
-          255.255.255.224 = /27
-          255.255.255.240 = /28
-          255.255.255.248 = /29
-          255.255.255.252 = /30
-          255.255.255.254 = /31
-          255.255.255.255 = /32
-
-          for ex, when ip is 10.99.4.24 and subnet mask is 255.255.255.0, full ip addr with the CIDR notations: 10.99.4.24/24
-        }
-        if newMask = '255.255.255.0' then
-          newMask := '/24'
-        else if newMask = '255.255.255.128' then
-          newMask := '/25'
-        else if newMask = '255.255.255.192' then
-          newMask := '/26'
-        else if newMask = '255.255.255.224' then
-          newMask := '/27'
-        else if newMask = '255.255.255.240' then
-          newMask := '/28'
-        else if newMask = '255.255.255.248' then
-          newMask := '/29'
-        else if newMask = '255.255.255.252' then
-          newMask := '/30'
-        else if newMask = '255.255.255.254' then
-          newMask := '/31'
-        else if newMask = '255.255.255.255' then
-          newMask := '/32'
-        else
-          newMask := '/24';
-
-        netConfigContents.Clear;
-        netConfigContents.Add(Format('network:', []));
-        netConfigContents.Add(Format('  version: 2', []));
-        netConfigContents.Add(Format('  renderer: networkd', []));
-        netConfigContents.Add(Format('  ethernets:', []));
-        netConfigContents.Add(Format('    %s:', [netInterface]));
-        netConfigContents.Add(Format('      dhcp4: no', []));
-        netConfigContents.Add(Format('      addresses: [%s%s]', [newIP, newMask]));
-        // netConfigContents.Add(Format('      addresses:', []));
-        // netConfigContents.Add(Format('        - %s%s', [newIP, newMask]));
-        // netConfigContents.Add(Format('      gateway4: %s', [newGate]));
-        netConfigContents.Add(Format('      nameservers:', []));
-        netConfigContents.Add(Format('        addresses: [8.8.8.8, 8.8.4.4]', []));
-
-      end
-      else // the case of old OS
-      begin
-        netConfigFileName := '/etc/network/interfaces';
-
-        {
-          auto eth0
-          iface eth0 inet static
-          address 192.168.1.10
-          netmask 255.255.255.0
-          gateway 192.168.1.1
-        }
-        netConfigContents.Clear;
-        netConfigContents.Add(Format('auto %s', [netInterface]));
-        netConfigContents.Add(Format('iface %s inet static', [netInterface]));
-        netConfigContents.Add(Format('address %s', [newIP]));
-        netConfigContents.Add(Format('netmask %s', [newMask]));
-        // netConfigContents.Add(Format('gateway %s', [newGate]));
-
-      end;
-
-      // run netplan config command to change with new ip address
-      cmd := Format('echo "%s" | sudo tee %s', [netConfigContents.Text, netConfigFileName]);
-      Self.SshExec.Exec(cmd, cmdResult, ErrOutput, ExitCode);
-      Sleep(1000);
-
-      if netConfigFileName.Contains('.yaml') then
-      begin
-        // restart ssh server: sudo systemctl restart sshd
-        SshExec.Exec('sudo systemctl restart sshd', cmdResult, ErrOutput, ExitCode);
-
-        // apply ip change: sudo netplan apply
-        SshExec.Exec('sudo netplan apply', cmdResult, ErrOutput, ExitCode);
-
-        // check if the new ip applied...
-        if TryPing(newIP) then
-        begin
-          // ShowMessage('Ping succeeded on New IP address');
-
-          res := True;
-          Self.FIsConnected := False;
-        end;
-
-      end
-      else if netConfigFileName = '/etc/network/interfaces' then
-      begin
-        SshExec.Exec('sudo systemctl restart networking.service', cmdResult, ErrOutput, ExitCode);
-        SshExec.Exec(Format('sudo ifdown %s && sudo ifup %s', [netInterface, netInterface]), cmdResult, ErrOutput, ExitCode);
-        SshExec.Exec(Format('sudo ifdown %s && sudo ifup %s', [netInterface, netInterface]), cmdResult, ErrOutput, ExitCode); // need twice, but not sure why
-        SshExec.Exec('sudo hostname -I', cmdResult, ErrOutput, ExitCode);
-
-        // check if new ip applied
-        if cmdResult.Contains(newIP) then
-        begin
-          res := True;
-          Self.FIsConnected := False;
-
-          // finally send cmd for reboot
-          SshExec.Exec('sudo reboot', cmdResult, ErrOutput, ExitCode);
         end
         else
         begin
           res := False;
-          Self.FIsConnected := False;
+          Result := res;
+          Exit;
         end;
 
       end;
+
     except
       on E: Exception do
       begin

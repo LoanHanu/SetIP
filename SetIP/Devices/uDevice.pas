@@ -3,22 +3,54 @@ unit uDevice;
 interface
 
 uses
-  System.Classes, System.IOUtils, System.Generics.Collections, System.Types, System.SysUtils, System.IniFiles;
+  System.Classes, System.IOUtils, System.Generics.Collections, System.Types, System.SysUtils, System.IniFiles,
+  uSshClient, uPuttySshClient, uLibSsh2Client, IdModbusClient;
+
+const
+  {
+    device type on modbus: the address 0x200: 0x20 = IO40, 0x0101 = TR40
+    Mac address from IO40 (0x201-0x203)
+  }
+  MODBUS_DEVTYPE_ADDR = $0200;
+  DEVTYPE_TR40 = $0101;
+  DEVTYPE_IO40 = $0020;
+  MODBUS_MAC_ADDR = $201; // $201 ~ $203 : 3 registers
 
 type
+  THostConnectionOption = (hcSsh, hcModbus);
+
+  TDeviceType = (dtNone, dtTR40, dtIO40);
+
   TDevice = class
-  private
+  protected
     FIPAddress: string;
     FSubnetMask: string;
     FDefaultGateway: string;
     FSshPort: Integer;
+    FModbusPort: Integer;
     FUser: string;
     FPassword: string;
+
+    FHostConnectionOption: THostConnectionOption;
 
     FNetInterface: string; // eth0 or enp0s3 or other...
     FNetConfigFileName: string;
 
+    FSshClient: TSshClient;
+    FModbusClient: TIdModBusClient;
+
   public
+    constructor Create; virtual;
+    destructor Destroy; override;
+
+    procedure ConnectSsh; virtual;
+    function TryPing(hostIP: string): Boolean; virtual;
+    function ChangeHostIP(newIP, newMask, newGate: string): Boolean; virtual;
+    function ChangeHostPass(newPass: string): Boolean; virtual;
+
+    function GetDevTypeViaModbus(hostIP: string; port: Integer = 502): TDeviceType;
+    function GetMacAddrViaModbus(hostIP: string; port: Integer = 502): string;
+
     property IPAddress: string read FIPAddress write FIPAddress;
     property SubnetMask: string read FSubnetMask write FSubnetMask;
     property DefaultGateway: string read FDefaultGateway write FDefaultGateway;
@@ -27,13 +59,17 @@ type
     property Password: string read FPassword write FPassword;
     property NetInterface: string read FNetInterface write FNetInterface;
     property NetConfigFileName: string read FNetConfigFileName write FNetConfigFileName;
-  end;
 
-  TIO40 = class(TDevice)
+    property SshClient: TSshClient read FSshClient;
+    property ModbusClient: TIdModBusClient read FModbusClient;
 
   end;
 
   TTR40 = class(TDevice)
+
+  end;
+
+  TIO40 = class(TDevice)
 
   end;
 
@@ -61,6 +97,9 @@ type
 
 implementation
 
+uses
+  IdIcmpClient;
+
 const
   T = '!" #$%&()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -70,6 +109,165 @@ begin
   Result := T[51] + T[48] + T[51] + T[17] + T[18] + T[16] + T[21] + T[34] + T[45] + T[55] + T[1] + T[52] + T[50] + T[20] + T[16];
 end;
 
+{ TDevice }
+constructor TDevice.Create;
+begin
+  Self.FSshClient := TLibSsh2Client.Create;
+  Self.FModbusClient := TIdModBusClient.Create(nil);
+
+  // default port numbers
+  Self.FSshPort := 22;
+  Self.FModbusPort := 502;
+end;
+
+destructor TDevice.Destroy;
+begin
+  Self.FSshClient.Free;
+  Self.FModbusClient.Free;
+
+end;
+
+procedure TDevice.ConnectSsh;
+begin
+  Self.FSshClient.Connect;
+end;
+
+function TDevice.TryPing(hostIP: string): Boolean;
+var
+  res: Boolean;
+  Ping: TIdIcmpClient;
+begin
+  res := False;
+  Ping := TIdIcmpClient.Create(nil);
+  // Ping.ReceiveTimeout := 3000; // 5s
+
+  try
+    Ping.Host := hostIP;
+    Ping.Ping();
+    // Ping.Ping('0000');
+    // case Ping.ReplyStatus.ReplyStatusType of
+    // rsEcho: ;
+    // rsError: ;
+    // rsTimeOut: ;
+    // rsErrorUnreachable: ;
+    // rsErrorTTLExceeded: ;
+    // rsErrorPacketTooBig: ;
+    // rsErrorParameter: ;
+    // rsErrorDatagramConversion: ;
+    // rsErrorSecurityFailure: ;
+    // rsSourceQuench: ;
+    // rsRedirect: ;
+    // rsTimeStamp: ;
+    // rsInfoRequest: ;
+    // rsAddressMaskRequest: ;
+    // rsTraceRoute: ;
+    // rsMobileHostReg: ;
+    // rsMobileHostRedir: ;
+    // rsIPv6WhereAreYou: ;
+    // rsIPv6IAmHere: ;
+    // rsSKIP: ;
+    // end;
+
+    if Ping.ReplyStatus.ReplyStatusType = rsEcho then
+      // if Ping.ReplyStatus.BytesReceived > 0 then
+      res := True
+    else
+      res := False;
+  except
+    on E: Exception do
+    begin
+      res := False;
+      raise E;
+      // ShowMessage('An exception occurred: ' + E.Message);
+    end;
+  end;
+
+  Ping.Free;
+  Result := res;
+end;
+
+function TDevice.ChangeHostIP(newIP: string; newMask: string; newGate: string): Boolean;
+begin
+  Result := Self.FSshClient.ChangeIP(newIP, newMask, newGate);
+end;
+
+function TDevice.ChangeHostPass(newPass: string): Boolean;
+begin
+  Result := False;
+end;
+
+function TDevice.GetDevTypeViaModbus(hostIP: string; port: Integer = 502): TDeviceType;
+var
+  devType: Word;
+begin
+  Self.FModbusClient.Host := hostIP;
+
+  Self.FModbusClient.port := Self.FModbusPort;
+  Self.FModbusClient.UnitID := $FF;
+  Self.FModbusClient.BaseRegister := 0;
+  // Self.FModbusClient.Port := port;
+
+  try
+    if Self.FModbusClient.ReadHoldingRegister(MODBUS_DEVTYPE_ADDR, devType) then
+    begin
+      if devType = DEVTYPE_TR40 then
+        Result := dtTR40
+      else if devType = DEVTYPE_IO40 then
+        Result := dtIO40
+      else
+        Result := dtNone;
+    end;
+  except
+    on E: Exception do
+    begin
+      Result := dtNone;
+      raise E;
+    end;
+  end;
+end;
+
+function TDevice.GetMacAddrViaModbus(hostIP: string; port: Integer = 502): string;
+var
+  regArray: array [0 .. 2] of Word;
+  hbyte, lbyte: UInt8;
+begin
+  Self.FModbusClient.Host := hostIP;
+
+  Self.FModbusClient.port := Self.FModbusPort;
+  Self.FModbusClient.UnitID := $FF;
+  Self.FModbusClient.BaseRegister := 0;
+  // Self.FModbusClient.Port := port;
+
+  try
+    if Self.FModbusClient.ReadHoldingRegisters(MODBUS_MAC_ADDR, 3, regArray) then
+    begin
+      // Result := Format('%s%s%s', [IntToHex(regArray[0], 4), IntToHex(regArray[1], 4), IntToHex(regArray[2], 4)]);
+
+      Result := '';
+      hbyte := (regArray[0] and $FF00) shr 8;
+      lbyte := regArray[0] and $00FF;
+      Result := Result + IntToHex(hbyte) + ':' + IntToHex(lbyte) + ':';
+
+      hbyte := (regArray[1] and $FF00) shr 8;
+      lbyte := regArray[1] and $00FF;
+      Result := Result + IntToHex(hbyte) + ':' + IntToHex(lbyte) + ':';
+
+      hbyte := (regArray[2] and $FF00) shr 8;
+      lbyte := regArray[2] and $00FF;
+      Result := Result + IntToHex(hbyte) + ':' + IntToHex(lbyte);
+
+    end;
+
+  finally
+
+  end;
+end;
+
+{ TTR40 }
+
+{ TIO40 }
+
+{ TDeviceManager }
 constructor TDeviceManager.Create;
 begin
   Self.FTR40 := TTR40.Create;
@@ -77,12 +275,16 @@ begin
   Self.FTR40.FSubnetMask := '255.255.255.0';
   Self.FTR40.FDefaultGateway := '0.0.0.0';
   Self.FTR40.FSshPort := 22;
+  Self.FTR40.FModbusPort := 502;
   Self.FTR40.FUser := 'root';
   Self.FTR40.FPassword := GetPW;
 
   Self.FIO40 := TIO40.Create;
   Self.FIO40.FIPAddress := '192.168.0.250';
+  Self.FIO40.FSubnetMask := '255.255.255.0';
+  Self.FIO40.FDefaultGateway := '0.0.0.0';
   Self.FIO40.FSshPort := 22;
+  Self.FIO40.FModbusPort := 502;
 
   Self.FST3800IniFile := 'ST3800.ini';
   Self.FDevConfigFileName := 'devconfig.ini';
